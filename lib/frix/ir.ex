@@ -7,11 +7,12 @@ defmodule Frix.IR do
   2. Executed directly in Elixir
   """
 
-  defstruct variables: [], functions: []
+  defstruct variables: [], functions: [], structs: []
 
   @type t :: %__MODULE__{
     variables: [variable()],
-    functions: [ir_function()]
+    functions: [ir_function()],
+    structs: [struct_def()]
   }
 
   @type variable :: %{
@@ -32,6 +33,16 @@ defmodule Frix.IR do
     type: String.t()
   }
 
+  @type struct_def :: %{
+    name: String.t(),
+    fields: [field()]
+  }
+
+  @type field :: %{
+    name: String.t(),
+    type: String.t()
+  }
+
   @type statement ::
     {:return, expression()} |
     {:assign, String.t(), expression()} |
@@ -41,7 +52,9 @@ defmodule Frix.IR do
     {:var, String.t()} |
     {:literal, term()} |
     {:binary_op, :add | :sub | :mul | :div, expression(), expression()} |
-    {:call, String.t(), [expression()]}
+    {:call, String.t(), [expression()]} |
+    {:struct_new, String.t(), [{String.t(), expression()}]} |
+    {:field_access, expression(), String.t()}
 
   def new do
     %__MODULE__{}
@@ -57,14 +70,20 @@ defmodule Frix.IR do
     %{ir | functions: [function | ir.functions]}
   end
 
+  def add_struct(ir, name, fields) do
+    struct_def = %{name: name, fields: fields}
+    %{ir | structs: [struct_def | ir.structs]}
+  end
+
   @doc """
   Convert IR to C code.
   """
   def to_c_code(%__MODULE__{} = ir) do
+    structs_code = generate_c_structs(ir.structs)
     variables_code = generate_c_variables(ir.variables)
     functions_code = generate_c_functions(ir.functions)
     
-    [variables_code, functions_code]
+    [structs_code, variables_code, functions_code]
     |> Enum.reject(&(&1 == ""))
     |> Enum.join("\n\n")
   end
@@ -75,7 +94,16 @@ defmodule Frix.IR do
   def execute(%__MODULE__{} = ir, function_name \\ "main", args \\ []) do
     # Initialize variables in process dictionary
     Enum.each(ir.variables, fn var ->
-      Process.put({:var, var.name}, var.value)
+      value = case var.value do
+        {:literal, literal_value} -> literal_value
+        expr -> evaluate_expression(expr)
+      end
+      Process.put({:var, var.name}, value)
+    end)
+
+    # Store struct definitions for runtime use
+    Enum.each(ir.structs, fn struct_def ->
+      Process.put({:struct_def, struct_def.name}, struct_def)
     end)
 
     # Find and execute function
@@ -87,6 +115,24 @@ defmodule Frix.IR do
 
   # Private helper functions for C code generation
 
+  defp generate_c_structs([]), do: ""
+  defp generate_c_structs(structs) do
+    structs
+    |> Enum.reverse()
+    |> Enum.map(&generate_c_struct/1)
+    |> Enum.join("\n\n")
+  end
+
+  defp generate_c_struct(%{name: name, fields: fields}) do
+    fields_str = fields
+    |> Enum.map(fn %{name: field_name, type: field_type} ->
+      "    #{field_type} #{field_name};"
+    end)
+    |> Enum.join("\n")
+    
+    "typedef struct {\n#{fields_str}\n} #{name};"
+  end
+
   defp generate_c_variables([]), do: ""
   defp generate_c_variables(variables) do
     variables
@@ -96,7 +142,12 @@ defmodule Frix.IR do
   end
 
   defp generate_c_variable(%{name: name, type: type, value: value}) do
-    "#{type} #{name} = #{format_c_value(value)};"
+    value_str = case value do
+      {:literal, literal_value} -> format_c_value(literal_value)
+      {:struct_new, _, _} = expr -> generate_c_expression(expr)
+      _ -> format_c_value(value)
+    end
+    "#{type} #{name} = #{value_str};"
   end
 
   defp generate_c_functions([]), do: ""
@@ -159,6 +210,19 @@ defmodule Frix.IR do
   defp generate_c_expression({:call, func_name, args}) do
     args_str = args |> Enum.map(&generate_c_expression/1) |> Enum.join(", ")
     "#{func_name}(#{args_str})"
+  end
+  defp generate_c_expression({:struct_new, struct_name, field_inits}) do
+    # Generate C struct literal initialization
+    field_inits_str = field_inits
+    |> Enum.map(fn {field_name, expr} ->
+      ".#{field_name} = #{generate_c_expression(expr)}"
+    end)
+    |> Enum.join(", ")
+    
+    "(#{struct_name}){#{field_inits_str}}"
+  end
+  defp generate_c_expression({:field_access, struct_expr, field_name}) do
+    "#{generate_c_expression(struct_expr)}.#{field_name}"
   end
 
   defp format_c_value(value) when is_integer(value), do: to_string(value)
@@ -251,5 +315,24 @@ defmodule Frix.IR do
     _ = func_name
     _ = args
     0
+  end
+
+  defp evaluate_expression({:struct_new, struct_name, field_inits}) do
+    # Create a map representing the struct instance
+    field_values = field_inits
+    |> Enum.map(fn {field_name, expr} ->
+      {field_name, evaluate_expression(expr)}
+    end)
+    |> Map.new()
+    
+    %{__struct__: struct_name, __fields__: field_values}
+  end
+
+  defp evaluate_expression({:field_access, struct_expr, field_name}) do
+    struct_value = evaluate_expression(struct_expr)
+    case struct_value do
+      %{__fields__: fields} -> Map.get(fields, field_name, 0)
+      _ -> 0
+    end
   end
 end

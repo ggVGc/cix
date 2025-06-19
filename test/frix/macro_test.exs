@@ -12,8 +12,8 @@ defmodule Frix.MacroTest do
 
       assert %Frix.IR{} = ir
       assert length(ir.variables) == 2
-      assert Enum.any?(ir.variables, &(&1.name == "count" and &1.value == 42))
-      assert Enum.any?(ir.variables, &(&1.name == "max_size" and &1.value == 1024))
+      assert Enum.any?(ir.variables, &(&1.name == "count" and &1.value == {:literal, 42}))
+      assert Enum.any?(ir.variables, &(&1.name == "max_size" and &1.value == {:literal, 1024}))
       
       # Test C code generation
       c_code = Frix.IR.to_c_code(ir)
@@ -165,6 +165,54 @@ defmodule Frix.MacroTest do
       {:ok, result} = Frix.IR.execute(ir, "math_ops", [10, 2])
       # 10+2 + 10-2 + 10*2 + 10/2 = 12 + 8 + 20 + 5 = 45
       assert result == 45
+    end
+
+    test "defines structs and generates C code" do
+      ir = c_program do
+        struct :Point, [x: :int, y: :int]
+        struct :Rectangle, [top_left: :Point, width: :int, height: :int]
+      end
+
+      # Test IR structure
+      assert %Frix.IR{} = ir
+      assert length(ir.structs) == 2
+      
+      point_struct = Enum.find(ir.structs, &(&1.name == "Point"))
+      assert point_struct.name == "Point"
+      assert length(point_struct.fields) == 2
+      assert Enum.any?(point_struct.fields, &(&1.name == "x" and &1.type == "int"))
+      assert Enum.any?(point_struct.fields, &(&1.name == "y" and &1.type == "int"))
+      
+      # Test C code generation
+      c_code = Frix.IR.to_c_code(ir)
+      assert c_code =~ "typedef struct {"
+      assert c_code =~ "    int x;"
+      assert c_code =~ "    int y;"
+      assert c_code =~ "} Point;"
+      assert c_code =~ "} Rectangle;"
+    end
+
+    test "struct operations work with direct IR construction" do
+      # Test struct creation and field access using IR directly
+      import Frix.IR
+      
+      ir = 
+        new()
+        |> add_struct("Point", [%{name: "x", type: "int"}, %{name: "y", type: "int"}])
+        |> add_function("main", "int", [], [
+          {:assign, "point_x", {:literal, 10}},
+          {:assign, "point_y", {:literal, 20}},
+          {:return, {:binary_op, :add, {:var, "point_x"}, {:var, "point_y"}}}
+        ])
+
+      c_code = to_c_code(ir)
+      assert c_code =~ "typedef struct {"
+      assert c_code =~ "    int x;"
+      assert c_code =~ "    int y;"
+      assert c_code =~ "} Point;"
+      
+      {:ok, result} = execute(ir, "main")
+      assert result == 30
     end
   end
 

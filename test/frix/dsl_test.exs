@@ -144,4 +144,26 @@ defmodule Frix.DSLTest do
       assert c_code =~ "printf(\"Factorial: %d\\n\", factorial(5));"
     end
   end
+
+  describe "IR struct functionality" do
+    test "creates IR with struct definitions" do
+      import Frix.IR
+      
+      ir = 
+        new()
+        |> add_struct("Point", [%{name: "x", type: "int"}, %{name: "y", type: "int"}])
+        |> add_variable("origin", "Point", {:struct_new, "Point", [{"x", {:literal, 0}}, {"y", {:literal, 0}}]})
+
+      assert length(ir.structs) == 1
+      [struct_def] = ir.structs
+      assert struct_def.name == "Point"
+      assert length(struct_def.fields) == 2
+      
+      c_code = to_c_code(ir)
+      assert c_code =~ "typedef struct {"
+      assert c_code =~ "    int x;"
+      assert c_code =~ "    int y;"
+      assert c_code =~ "} Point;"
+    end
+  end
 end

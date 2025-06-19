@@ -12,8 +12,10 @@ defmodule Frix.Macro do
   
   Example:
       ir = c_program do
+        struct :Point, [x: :int, y: :int]
+        
         var :count, :int, 42
-        var :max_size, :long, 1024
+        var :origin, :Point, Point.new(x: 0, y: 0)
         
         function :add, :int, [x: :int, y: :int] do
           return x + y
@@ -33,7 +35,7 @@ defmodule Frix.Macro do
   """
   defmacro c_program(do: block) do
     quote do
-      import Frix.Macro, only: [var: 3, function: 3, function: 4, return: 1]
+      import Frix.Macro, only: [var: 3, function: 3, function: 4, return: 1, struct: 2]
       var!(ir) = Frix.IR.new()
       unquote(transform_block(block))
       var!(ir)
@@ -71,6 +73,16 @@ defmodule Frix.Macro do
   end
 
   @doc """
+  Adds a struct definition to the current IR context.
+  """
+  defmacro struct(name, fields) do
+    quote do
+      field_list = unquote(build_ir_fields(fields))
+      var!(ir) = Frix.IR.add_struct(var!(ir), unquote(to_string(name)), field_list)
+    end
+  end
+
+  @doc """
   Return statement for functions.
   """
   defmacro return(_expr) do
@@ -97,7 +109,14 @@ defmodule Frix.Macro do
 
   defp transform_statement({:var, _, [name, type, value]}) do
     quote do
-      var!(ir) = Frix.IR.add_variable(var!(ir), unquote(to_string(name)), unquote(to_string(type)), unquote(value))
+      var!(ir) = Frix.IR.add_variable(var!(ir), unquote(to_string(name)), unquote(to_string(type)), unquote(transform_ir_expression(value)))
+    end
+  end
+
+  defp transform_statement({:struct, _, [name, fields]}) do
+    quote do
+      field_list = unquote(build_ir_fields(fields))
+      var!(ir) = Frix.IR.add_struct(var!(ir), unquote(to_string(name)), field_list)
     end
   end
 
@@ -122,6 +141,13 @@ defmodule Frix.Macro do
 
   defp build_ir_params(params) when is_list(params) do
     params
+    |> Enum.map(fn {name, type} ->
+      quote do: %{name: unquote(to_string(name)), type: unquote(to_string(type))}
+    end)
+  end
+
+  defp build_ir_fields(fields) when is_list(fields) do
+    fields
     |> Enum.map(fn {name, type} ->
       quote do: %{name: unquote(to_string(name)), type: unquote(to_string(type))}
     end)
@@ -188,7 +214,32 @@ defmodule Frix.Macro do
     quote do: {:call, unquote(to_string(func_name)), unquote(transformed_args)}
   end
 
+  # Handle struct.new(field: value, ...) syntax
+  defp transform_ir_expression({{:., _, [{struct_name, _, nil}, :new]}, _, args}) when is_atom(struct_name) do
+    # Extract field list from arguments - Elixir keyword list syntax becomes a single list argument
+    field_list = case args do
+      [field_list] when is_list(field_list) -> field_list
+      field_list when is_list(field_list) -> field_list
+      _ -> []
+    end
+    
+    field_inits = build_struct_field_inits(field_list)
+    quote do: {:struct_new, unquote(to_string(struct_name)), unquote(field_inits)}
+  end
+
+  # Handle struct.field access
+  defp transform_ir_expression({{:., _, [struct_expr, field_name]}, _, []}) when is_atom(field_name) do
+    quote do: {:field_access, unquote(transform_ir_expression(struct_expr)), unquote(to_string(field_name))}
+  end
+
   defp transform_ir_expression(expr) do
     quote do: {:literal, unquote(expr)}
+  end
+
+  defp build_struct_field_inits(field_list) when is_list(field_list) do
+    field_list
+    |> Enum.map(fn {field_name, expr} ->
+      quote do: {unquote(to_string(field_name)), unquote(transform_ir_expression(expr))}
+    end)
   end
 end
