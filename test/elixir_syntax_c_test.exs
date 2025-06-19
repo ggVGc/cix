@@ -10,7 +10,7 @@ defmodule ElixirSyntaxCTest do
       ir = c_program do
         struct :Point, [x: :int, y: :int]
         
-        var :global_value, :int, 100
+        let global_value :: int = 100
         
         defn add_numbers(a :: int, b :: int) :: int do
           sum = a + b
@@ -87,7 +87,7 @@ defmodule ElixirSyntaxCTest do
 
     test "multiple functions compile correctly" do
       ir = c_program do
-        var :counter, :int, 0
+        let counter :: int = 0
         
         defn double_value(x :: int) :: int do
           return x * 2

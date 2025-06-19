@@ -43,7 +43,7 @@ defmodule Frix.ElixirSyntaxTest do
 
     test "generates complete program with new syntax" do
       ir = c_program do
-        var :count, :int, 0
+        let count :: int = 0
         
         defn increment() :: void do
           count = count + 1
@@ -76,7 +76,7 @@ defmodule Frix.ElixirSyntaxTest do
 
     test "can execute new syntax in Elixir" do
       ir = c_program do
-        var :value, :int, 10
+        let value :: int = 10
         
         defn double(x :: int) :: int do
           return x * 2
@@ -121,7 +121,7 @@ defmodule Frix.ElixirSyntaxTest do
   describe "multiple functions compatibility" do
     test "multiple defn functions work together" do
       ir = c_program do
-        var :counter, :int, 0
+        let counter :: int = 0
         
         defn increment_by_one() :: void do
           counter = counter + 1

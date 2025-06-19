@@ -14,14 +14,14 @@ defmodule Frix.Macro do
       ir = c_program do
         struct :Point, [x: :int, y: :int]
         
-        var :count, :int, 42
-        var :origin, :Point, Point.new(x: 0, y: 0)
+        let count :: int = 42
+        let origin :: Point = Point.new(x: 0, y: 0)
         
-        def add(x :: int, y :: int) :: int do
+        defn add(x :: int, y :: int) :: int do
           return x + y
         end
         
-        def main() :: int do
+        defn main() :: int do
           printf("Hello World!")
           return 0
         end
@@ -35,7 +35,7 @@ defmodule Frix.Macro do
   """
   defmacro c_program(do: block) do
     quote do
-      import Frix.Macro, only: [var: 3, defn: 2, return: 1, struct: 2]
+      import Frix.Macro, only: [let: 1, defn: 2, return: 1, struct: 2]
       var!(ir) = Frix.IR.new()
       unquote(transform_block(block))
       var!(ir)
@@ -43,13 +43,19 @@ defmodule Frix.Macro do
   end
 
   @doc """
-  Adds a variable to the current IR context.
+  Adds a variable using Elixir-like syntax with type annotations.
+  
+  Examples:
+    let count :: int = 42
+    let name :: string = "hello"
+    let point :: Point = Point.new(x: 0, y: 0)
   """
-  defmacro var(name, type, value) do
+  defmacro let({:"::", _, [{name, _, nil}, {:=, _, [{type, _, nil}, value]}]}) do
     quote do
-      var!(ir) = Frix.IR.add_variable(var!(ir), unquote(to_string(name)), unquote(to_string(type)), unquote(value))
+      var!(ir) = Frix.IR.add_variable(var!(ir), unquote(to_string(name)), unquote(to_string(type)), unquote(transform_ir_expression(value)))
     end
   end
+
 
   @doc """
   Adds a function using Elixir-like defn syntax (def conflicts with Kernel.def).
@@ -116,11 +122,13 @@ defmodule Frix.Macro do
     transform_statement(single_statement)
   end
 
-  defp transform_statement({:var, _, [name, type, value]}) do
+  # Handle new let syntax in statement transformation
+  defp transform_statement({:let, _, [{:"::", _, [{name, _, nil}, {:=, _, [{type, _, nil}, value]}]}]}) do
     quote do
       var!(ir) = Frix.IR.add_variable(var!(ir), unquote(to_string(name)), unquote(to_string(type)), unquote(transform_ir_expression(value)))
     end
   end
+
 
   defp transform_statement({:struct, _, [name, fields]}) do
     quote do

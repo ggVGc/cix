@@ -6,8 +6,8 @@ defmodule Frix.MacroTest do
   describe "c_program macro with IR output" do
     test "generates IR for simple program with variables" do
       ir = c_program do
-        var :count, :int, 42
-        var :max_size, :long, 1024
+        let count :: int = 42
+        let max_size :: long = 1024
       end
 
       assert %Frix.IR{} = ir
@@ -98,7 +98,7 @@ defmodule Frix.MacroTest do
 
     test "generates complete IR and C program" do
       ir = c_program do
-        var :global_counter, :int, 0
+        let global_counter :: int = 0
         
         defn increment() :: void do
           global_counter = global_counter + 1
@@ -127,7 +127,7 @@ defmodule Frix.MacroTest do
 
     test "can execute IR directly in Elixir" do
       ir = c_program do
-        var :counter, :int, 5
+        let counter :: int = 5
         
         defn add(x :: int, y :: int) :: int do
           return x + y

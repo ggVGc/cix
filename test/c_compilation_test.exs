@@ -12,7 +12,7 @@ defmodule CCompilationTest do
         struct :Point, [x: :int, y: :int]
         struct :Rectangle, [width: :int, height: :int]
         
-        var :global_count, :int, 0
+        let global_count :: int = 0
         
         defn calculate_area(width :: int, height :: int) :: int do
           area = width * height
