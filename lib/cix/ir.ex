@@ -103,6 +103,60 @@ defmodule Cix.IR do
   end
 
   @doc """
+  Merge multiple IR instances into a single IR.
+  Functions, variables, and structs are combined.
+  """
+  def merge(irs) when is_list(irs) do
+    Enum.reduce(irs, new(), fn ir, acc ->
+      %{acc |
+        variables: acc.variables ++ ir.variables,
+        functions: acc.functions ++ ir.functions,
+        structs: acc.structs ++ ir.structs,
+        modules: acc.modules ++ ir.modules
+      }
+    end)
+  end
+
+  def merge(ir1, ir2) do
+    merge([ir1, ir2])
+  end
+
+  @doc """
+  Validate module imports against available exports.
+  Returns {:ok, ir} if all imports are satisfied, {:error, reasons} otherwise.
+  """
+  def validate_imports(%__MODULE__{} = ir) do
+    errors = ir.modules
+    |> Enum.flat_map(&validate_module_imports(&1, ir.modules))
+    
+    case errors do
+      [] -> {:ok, ir}
+      _ -> {:error, errors}
+    end
+  end
+  
+  defp validate_module_imports(module, all_modules) do
+    module.imports
+    |> Enum.flat_map(fn import ->
+      validate_import(import, module.name, all_modules)
+    end)
+  end
+  
+  defp validate_import(%{module_name: imported_module, functions: imported_functions}, importing_module, all_modules) do
+    case Enum.find(all_modules, &(&1.name == imported_module)) do
+      nil ->
+        ["Module '#{importing_module}' imports from '#{imported_module}' but '#{imported_module}' does not exist"]
+      
+      target_module ->
+        imported_functions
+        |> Enum.reject(&(&1 in target_module.exports))
+        |> Enum.map(fn func ->
+          "Module '#{importing_module}' imports function '#{func}' from '#{imported_module}' but '#{func}' is not exported"
+        end)
+    end
+  end
+
+  @doc """
   Convert IR to C code.
   """
   def to_c_code(%__MODULE__{} = ir) do

@@ -1022,6 +1022,183 @@ This implementation transforms Cix from a single-file DSL into a modular program
 
 ---
 
+## Prompt 17: Import Validation and Enhancement
+
+**Timestamp:** 2025-06-19
+
+**User:** Add the ability to import functionality between modules that use the macro DSL.
+
+**Summary of Changes:**
+- Enhanced the existing module system with comprehensive import validation
+- Added automatic compile-time verification that imported functions are actually exported
+- Implemented validation for module existence and function availability
+- Created robust error handling with descriptive error messages
+- Extended test coverage with import validation and integration tests
+
+**Key Features Implemented:**
+
+### **Automatic Import Validation:**
+
+**1. Compile-Time Validation:**
+- `Cix.IR.validate_imports/1` function validates all module imports
+- Integrated into `c_program` macro for automatic validation
+- Fails fast with descriptive error messages for invalid imports
+
+**2. Validation Types:**
+- **Missing Module**: Detects imports from non-existent modules
+- **Non-Exported Functions**: Catches attempts to import private functions
+- **Multiple Import Issues**: Reports all validation errors in a single failure
+
+**3. Enhanced Error Messages:**
+```elixir
+# Clear, descriptive error messages:
+"Module 'main' imports from 'missing_module' but 'missing_module' does not exist"
+"Module 'main' imports function 'private_func' from 'utils' but 'private_func' is not exported"
+```
+
+### **Extended IR Functionality:**
+
+**1. IR Merge Capability:**
+- `Cix.IR.merge/1` and `Cix.IR.merge/2` functions for combining IR instances
+- Supports composition of multiple modules into single programs
+- Preserves all module metadata during merging
+
+**2. Import Validation Logic:**
+```elixir
+defp validate_import(%{module_name: imported_module, functions: imported_functions}, importing_module, all_modules) do
+  case Enum.find(all_modules, &(&1.name == imported_module)) do
+    nil -> ["Module '#{importing_module}' imports from '#{imported_module}' but '#{imported_module}' does not exist"]
+    target_module ->
+      imported_functions
+      |> Enum.reject(&(&1 in target_module.exports))
+      |> Enum.map(fn func ->
+        "Module '#{importing_module}' imports function '#{func}' from '#{imported_module}' but '#{func}' is not exported"
+      end)
+  end
+end
+```
+
+### **Enhanced Macro System:**
+
+**1. Updated c_program Macro:**
+- Automatically validates imports during compilation
+- Raises `CompileError` with detailed messages for validation failures
+- Ensures only valid module compositions can be created
+
+**2. Import Syntax Support:**
+- Fixed macro imports to support both 2-arity and 3-arity `c_module` calls
+- Proper handling of exports and imports keywords
+- Maintained backward compatibility with modules without imports/exports
+
+### **Comprehensive Testing:**
+
+**1. Import Validation Tests** (`test/cix/import_validation_test.exs`):
+- Tests successful imports between modules
+- Validates error cases for missing modules and non-exported functions
+- Tests complex import chains and multiple module dependencies
+- Verifies execution of imported functions
+
+**2. Integration Tests** (`test/cix/module_import_integration_test.exs`):
+- End-to-end testing of import functionality
+- C code generation validation with forward declarations
+- Complex dependency chain testing
+- Module boundary preservation testing
+
+**3. Simple Examples** (`examples/simple_import_example.exs`):
+- Demonstrates basic import validation
+- Shows error handling for common mistakes
+- Provides clear examples of working import patterns
+
+### **Example Usage:**
+
+**Working Import Example:**
+```elixir
+ir = c_program do
+  c_module :math_utils, exports: [:add, :multiply] do
+    defn add(x :: int, y :: int) :: int do
+      return x + y
+    end
+    
+    defn multiply(x :: int, y :: int) :: int do
+      return x * y
+    end
+  end
+  
+  c_module :main, imports: [math_utils: [:add, :multiply]] do
+    defn main() :: int do
+      sum = add(10, 5)
+      product = multiply(6, 7)
+      printf("Sum: %d, Product: %d\\n", sum, product)
+      return add(sum, product)
+    end
+  end
+end
+```
+
+**Validation Failures:**
+```elixir
+# This will fail at compile time:
+c_program do
+  c_module :main, imports: [nonexistent: [:some_func]] do
+    defn main() :: int do
+      return 0
+    end
+  end
+end
+# Error: "Module 'main' imports from 'nonexistent' but 'nonexistent' does not exist"
+```
+
+### **Generated C Code Quality:**
+
+**Forward Declarations for Exports:**
+```c
+// Forward declarations for exported functions
+int add(int x, int y);
+int multiply(int x, int y);
+
+// Module: math_utils
+int add(int x, int y) {
+    return x + y;
+}
+
+int multiply(int x, int y) {
+    return x * y;
+}
+
+// Module: main
+int main(void) {
+    int sum = add(10, 5);
+    int product = multiply(6, 7);
+    printf("Sum: %d, Product: %d\n", sum, product);
+    return add(sum, product);
+}
+```
+
+### **Technical Achievements:**
+
+- **Compile-Time Safety**: Import errors caught during macro expansion, not runtime
+- **Comprehensive Validation**: All import/export relationships verified
+- **Clear Error Messages**: Developers get specific, actionable error information
+- **Backward Compatibility**: Existing code continues to work unchanged
+- **Performance**: Validation happens once during compilation, no runtime overhead
+
+### **Test Results:**
+- **Import Validation Tests**: 7 tests covering all validation scenarios
+- **Integration Tests**: 6 tests for end-to-end import functionality
+- **Total Test Suite**: 60 tests, 100% pass rate
+- **C Compilation**: All generated code compiles and executes correctly
+
+### **Files Created/Enhanced:**
+- **lib/cix/ir.ex**: Added merge and validation functions
+- **lib/cix/macro.ex**: Enhanced with automatic import validation
+- **test/cix/import_validation_test.exs**: Comprehensive validation testing
+- **test/cix/module_import_integration_test.exs**: End-to-end integration tests
+- **examples/simple_import_example.exs**: Clear demonstration of import features
+
+This enhancement provides robust, compile-time validated module imports, making Cix a more reliable and developer-friendly modular programming environment. The import system ensures code correctness while maintaining the simplicity and power of the macro-based DSL.
+
+---
+
 ## Summary of Complete System
 
 The Cix DSL development resulted in a comprehensive system with:

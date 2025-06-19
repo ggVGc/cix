@@ -35,10 +35,17 @@ defmodule Cix.Macro do
   """
   defmacro c_program(do: block) do
     quote do
-      import Cix.Macro, only: [let: 1, defn: 2, return: 1, struct: 2, c_module: 2]
+      import Cix.Macro, only: [let: 1, defn: 2, return: 1, struct: 2, c_module: 2, c_module: 3]
       var!(ir) = Cix.IR.new()
       unquote(transform_block(block))
-      var!(ir)
+      
+      # Validate imports if modules exist
+      case Cix.IR.validate_imports(var!(ir)) do
+        {:ok, validated_ir} -> validated_ir
+        {:error, errors} ->
+          raise CompileError, 
+            description: "Module import validation failed:\n" <> Enum.join(errors, "\n")
+      end
     end
   end
 
