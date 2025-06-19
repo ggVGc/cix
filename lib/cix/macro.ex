@@ -259,14 +259,14 @@ defmodule Cix.Macro do
   defp build_elixir_params(params) when is_list(params) do
     params
     |> Enum.map(fn
-      {:"::", _, [{name, _, nil}, type]} ->
+      {:"::", _, [{name, _, _}, type]} ->
         type_str = case type do
-          {type_name, _, nil} -> to_string(type_name)
+          {type_name, _, _} -> to_string(type_name)
           type_name when is_atom(type_name) -> to_string(type_name)
           _ -> "int"
         end
         quote do: %{name: unquote(to_string(name)), type: unquote(type_str)}
-      {name, _, nil} ->
+      {name, _, _} ->
         # Default to int if no type specified
         quote do: %{name: unquote(to_string(name)), type: "int"}
     end)
