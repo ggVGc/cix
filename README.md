@@ -1,6 +1,7 @@
 # Cix
 
 **A Domain Specific Language (DSL) in Elixir for generating C code with natural syntax**
+Mainly developed using LLM as a technology exploration.
 
 Cix provides an Elixir-like syntax for writing C programs, with dual execution capabilities: compile to C or execute directly in Elixir.
 
