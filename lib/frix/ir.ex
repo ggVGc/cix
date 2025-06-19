@@ -81,7 +81,7 @@ defmodule Frix.IR do
   def to_c_code(%__MODULE__{} = ir) do
     structs_code = generate_c_structs(ir.structs)
     variables_code = generate_c_variables(ir.variables)
-    functions_code = generate_c_functions(ir.functions)
+    functions_code = generate_c_functions(ir.functions, ir.variables)
     
     [structs_code, variables_code, functions_code]
     |> Enum.reject(&(&1 == ""))
@@ -150,19 +150,48 @@ defmodule Frix.IR do
     "#{type} #{name} = #{value_str};"
   end
 
-  defp generate_c_functions([]), do: ""
-  defp generate_c_functions(functions) do
+  defp generate_c_functions([], _), do: ""
+  defp generate_c_functions(functions, global_vars) do
     functions
     |> Enum.reverse()
-    |> Enum.map(&generate_c_function/1)
+    |> Enum.map(&generate_c_function(&1, global_vars))
     |> Enum.join("\n\n")
   end
 
-  defp generate_c_function(%{name: name, return_type: return_type, params: params, body: body}) do
+  defp generate_c_function(%{name: name, return_type: return_type, params: params, body: body}, global_vars) do
     params_str = generate_c_params(params)
+    
+    # Extract local variables from assignments, excluding globals and params
+    local_vars = extract_local_variables(body, params, global_vars)
+    local_decls = generate_local_declarations(local_vars)
     body_str = generate_c_body(body)
     
-    "#{return_type} #{name}(#{params_str}) {\n#{body_str}\n}"
+    function_body = case local_decls do
+      "" -> body_str
+      _ -> "#{local_decls}\n#{body_str}"
+    end
+    
+    "#{return_type} #{name}(#{params_str}) {\n#{function_body}\n}"
+  end
+
+  defp extract_local_variables(body, params, global_vars) do
+    param_names = params |> Enum.map(& &1.name) |> MapSet.new()
+    global_names = global_vars |> Enum.map(& &1.name) |> MapSet.new()
+    
+    body
+    |> Enum.flat_map(&extract_assigned_vars/1)
+    |> Enum.uniq()
+    |> Enum.reject(&(MapSet.member?(param_names, &1) or MapSet.member?(global_names, &1)))
+  end
+
+  defp extract_assigned_vars({:assign, var_name, _expr}), do: [var_name]
+  defp extract_assigned_vars(_), do: []
+
+  defp generate_local_declarations([]), do: ""
+  defp generate_local_declarations(vars) do
+    vars
+    |> Enum.map(fn var_name -> "    int #{var_name};" end)
+    |> Enum.join("\n")
   end
 
   defp generate_c_params([]), do: "void"
