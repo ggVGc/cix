@@ -1,0 +1,255 @@
+defmodule Frix.IR do
+  @moduledoc """
+  Intermediate Representation (IR) for the Frix DSL.
+  
+  The IR provides a common format that can be:
+  1. Converted to C code
+  2. Executed directly in Elixir
+  """
+
+  defstruct variables: [], functions: []
+
+  @type t :: %__MODULE__{
+    variables: [variable()],
+    functions: [ir_function()]
+  }
+
+  @type variable :: %{
+    name: String.t(),
+    type: String.t(),
+    value: term()
+  }
+
+  @type ir_function :: %{
+    name: String.t(),
+    return_type: String.t(),
+    params: [param()],
+    body: [statement()]
+  }
+
+  @type param :: %{
+    name: String.t(),
+    type: String.t()
+  }
+
+  @type statement ::
+    {:return, expression()} |
+    {:assign, String.t(), expression()} |
+    {:call, String.t(), [expression()]}
+
+  @type expression ::
+    {:var, String.t()} |
+    {:literal, term()} |
+    {:binary_op, :add | :sub | :mul | :div, expression(), expression()} |
+    {:call, String.t(), [expression()]}
+
+  def new do
+    %__MODULE__{}
+  end
+
+  def add_variable(ir, name, type, value) do
+    variable = %{name: name, type: type, value: value}
+    %{ir | variables: [variable | ir.variables]}
+  end
+
+  def add_function(ir, name, return_type, params, body) do
+    function = %{name: name, return_type: return_type, params: params, body: body}
+    %{ir | functions: [function | ir.functions]}
+  end
+
+  @doc """
+  Convert IR to C code.
+  """
+  def to_c_code(%__MODULE__{} = ir) do
+    variables_code = generate_c_variables(ir.variables)
+    functions_code = generate_c_functions(ir.functions)
+    
+    [variables_code, functions_code]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n\n")
+  end
+
+  @doc """
+  Execute IR directly in Elixir.
+  """
+  def execute(%__MODULE__{} = ir, function_name \\ "main", args \\ []) do
+    # Initialize variables in process dictionary
+    Enum.each(ir.variables, fn var ->
+      Process.put({:var, var.name}, var.value)
+    end)
+
+    # Find and execute function
+    case Enum.find(ir.functions, &(&1.name == function_name)) do
+      nil -> {:error, "Function #{function_name} not found"}
+      function -> execute_function(ir, function, args)
+    end
+  end
+
+  # Private helper functions for C code generation
+
+  defp generate_c_variables([]), do: ""
+  defp generate_c_variables(variables) do
+    variables
+    |> Enum.reverse()
+    |> Enum.map(&generate_c_variable/1)
+    |> Enum.join("\n")
+  end
+
+  defp generate_c_variable(%{name: name, type: type, value: value}) do
+    "#{type} #{name} = #{format_c_value(value)};"
+  end
+
+  defp generate_c_functions([]), do: ""
+  defp generate_c_functions(functions) do
+    functions
+    |> Enum.reverse()
+    |> Enum.map(&generate_c_function/1)
+    |> Enum.join("\n\n")
+  end
+
+  defp generate_c_function(%{name: name, return_type: return_type, params: params, body: body}) do
+    params_str = generate_c_params(params)
+    body_str = generate_c_body(body)
+    
+    "#{return_type} #{name}(#{params_str}) {\n#{body_str}\n}"
+  end
+
+  defp generate_c_params([]), do: "void"
+  defp generate_c_params(params) do
+    params
+    |> Enum.map(fn %{name: name, type: type} -> "#{type} #{name}" end)
+    |> Enum.join(", ")
+  end
+
+  defp generate_c_body([]), do: ""
+  defp generate_c_body(statements) do
+    statements
+    |> Enum.map(&generate_c_statement/1)
+    |> Enum.map(&("    " <> &1))
+    |> Enum.join("\n")
+  end
+
+  defp generate_c_statement({:return, expr}) do
+    "return #{generate_c_expression(expr)};"
+  end
+
+  defp generate_c_statement({:assign, var_name, expr}) do
+    "#{var_name} = #{generate_c_expression(expr)};"
+  end
+
+  defp generate_c_statement({:call, func_name, args}) do
+    args_str = args |> Enum.map(&generate_c_expression/1) |> Enum.join(", ")
+    "#{func_name}(#{args_str});"
+  end
+
+  defp generate_c_expression({:var, name}), do: name
+  defp generate_c_expression({:literal, value}), do: format_c_value(value)
+  defp generate_c_expression({:binary_op, :add, left, right}) do
+    "#{generate_c_expression(left)} + #{generate_c_expression(right)}"
+  end
+  defp generate_c_expression({:binary_op, :sub, left, right}) do
+    "#{generate_c_expression(left)} - #{generate_c_expression(right)}"
+  end
+  defp generate_c_expression({:binary_op, :mul, left, right}) do
+    "#{generate_c_expression(left)} * #{generate_c_expression(right)}"
+  end
+  defp generate_c_expression({:binary_op, :div, left, right}) do
+    "#{generate_c_expression(left)} / #{generate_c_expression(right)}"
+  end
+  defp generate_c_expression({:call, func_name, args}) do
+    args_str = args |> Enum.map(&generate_c_expression/1) |> Enum.join(", ")
+    "#{func_name}(#{args_str})"
+  end
+
+  defp format_c_value(value) when is_integer(value), do: to_string(value)
+  defp format_c_value(value) when is_binary(value), do: "\"#{value}\""
+  defp format_c_value(value), do: inspect(value)
+
+  # Private helper functions for Elixir execution
+
+  defp execute_function(ir, function, args) do
+    # Bind parameters to arguments
+    Enum.zip(function.params, args)
+    |> Enum.each(fn {param, arg} ->
+      Process.put({:var, param.name}, arg)
+    end)
+
+    # Execute function body
+    try do
+      result = execute_statements(ir, function.body)
+      {:ok, result}
+    catch
+      {:return, value} -> {:ok, value}
+    end
+  end
+
+  defp execute_statements(_ir, []), do: nil
+  defp execute_statements(ir, [stmt | rest]) do
+    execute_statement(ir, stmt)
+    execute_statements(ir, rest)
+  end
+
+  defp execute_statement(_ir, {:return, expr}) do
+    value = evaluate_expression(expr)
+    throw({:return, value})
+  end
+
+  defp execute_statement(_ir, {:assign, var_name, expr}) do
+    value = evaluate_expression(expr)
+    Process.put({:var, var_name}, value)
+  end
+
+  defp execute_statement(ir, {:call, func_name, args}) do
+    case func_name do
+      "printf" ->
+        # Handle printf specially for demo purposes
+        evaluated_args = Enum.map(args, &evaluate_expression/1)
+        case evaluated_args do
+          [format | [_ | _] = values] -> 
+            IO.puts(:io_lib.format(to_charlist(format), values))
+          [format] -> 
+            IO.puts(format)
+          [] -> 
+            IO.puts("")
+        end
+      _ ->
+        # Try to find and call function from IR
+        case Enum.find(ir.functions, &(&1.name == func_name)) do
+          nil -> {:error, "Function #{func_name} not found"}
+          function ->
+            evaluated_args = Enum.map(args, &evaluate_expression/1)
+            execute_function(ir, function, evaluated_args)
+        end
+    end
+  end
+
+  defp evaluate_expression({:var, name}) do
+    Process.get({:var, name}, 0)
+  end
+
+  defp evaluate_expression({:literal, value}), do: value
+
+  defp evaluate_expression({:binary_op, :add, left, right}) do
+    evaluate_expression(left) + evaluate_expression(right)
+  end
+
+  defp evaluate_expression({:binary_op, :sub, left, right}) do
+    evaluate_expression(left) - evaluate_expression(right)
+  end
+
+  defp evaluate_expression({:binary_op, :mul, left, right}) do
+    evaluate_expression(left) * evaluate_expression(right)
+  end
+
+  defp evaluate_expression({:binary_op, :div, left, right}) do
+    div(evaluate_expression(left), evaluate_expression(right))
+  end
+
+  defp evaluate_expression({:call, func_name, args}) do
+    # This is a placeholder - in a real implementation we'd need the IR context
+    # For now, return 0 as placeholder
+    _ = func_name
+    _ = args
+    0
+  end
+end
