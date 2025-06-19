@@ -7,12 +7,13 @@ defmodule Cix.IR do
   2. Executed directly in Elixir
   """
 
-  defstruct variables: [], functions: [], structs: []
+  defstruct variables: [], functions: [], structs: [], modules: []
 
   @type t :: %__MODULE__{
     variables: [variable()],
     functions: [ir_function()],
-    structs: [struct_def()]
+    structs: [struct_def()],
+    modules: [module_def()]
   }
 
   @type variable :: %{
@@ -41,6 +42,20 @@ defmodule Cix.IR do
   @type field :: %{
     name: String.t(),
     type: String.t()
+  }
+
+  @type module_def :: %{
+    name: String.t(),
+    exports: [String.t()],
+    imports: [module_import()],
+    variables: [variable()],
+    functions: [ir_function()],
+    structs: [struct_def()]
+  }
+
+  @type module_import :: %{
+    module_name: String.t(),
+    functions: [String.t()]
   }
 
   @type statement ::
@@ -75,17 +90,34 @@ defmodule Cix.IR do
     %{ir | structs: [struct_def | ir.structs]}
   end
 
+  def add_module(ir, name, exports, imports, variables, functions, structs) do
+    module_def = %{
+      name: name,
+      exports: exports,
+      imports: imports,
+      variables: variables,
+      functions: functions,
+      structs: structs
+    }
+    %{ir | modules: [module_def | ir.modules]}
+  end
+
   @doc """
   Convert IR to C code.
   """
   def to_c_code(%__MODULE__{} = ir) do
-    structs_code = generate_c_structs(ir.structs)
-    variables_code = generate_c_variables(ir.variables)
-    functions_code = generate_c_functions(ir.functions, ir.variables)
-    
-    [structs_code, variables_code, functions_code]
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.join("\n\n")
+    # Generate module code if modules exist, otherwise generate flat code
+    if Enum.empty?(ir.modules) do
+      structs_code = generate_c_structs(ir.structs)
+      variables_code = generate_c_variables(ir.variables)
+      functions_code = generate_c_functions(ir.functions, ir.variables)
+      
+      [structs_code, variables_code, functions_code]
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.join("\n\n")
+    else
+      generate_c_modules(ir)
+    end
   end
 
   @doc """
@@ -95,7 +127,7 @@ defmodule Cix.IR do
     # Store IR context in process dictionary for function calls
     Process.put(:current_ir, ir)
     
-    # Initialize variables in process dictionary
+    # Initialize global variables in process dictionary
     Enum.each(ir.variables, fn var ->
       value = case var.value do
         {:literal, literal_value} -> literal_value
@@ -104,13 +136,31 @@ defmodule Cix.IR do
       Process.put({:var, var.name}, value)
     end)
 
+    # Initialize module variables
+    Enum.each(ir.modules, fn module ->
+      Enum.each(module.variables, fn var ->
+        value = case var.value do
+          {:literal, literal_value} -> literal_value
+          expr -> evaluate_expression(expr)
+        end
+        Process.put({:var, var.name}, value)
+      end)
+    end)
+
     # Store struct definitions for runtime use
     Enum.each(ir.structs, fn struct_def ->
       Process.put({:struct_def, struct_def.name}, struct_def)
     end)
+    
+    # Store module struct definitions
+    Enum.each(ir.modules, fn module ->
+      Enum.each(module.structs, fn struct_def ->
+        Process.put({:struct_def, struct_def.name}, struct_def)
+      end)
+    end)
 
-    # Find and execute function
-    result = case Enum.find(ir.functions, &(&1.name == function_name)) do
+    # Find and execute function - check global functions first, then modules
+    result = case find_function(ir, function_name) do
       nil -> {:error, "Function #{function_name} not found"}
       function -> execute_function(ir, function, args)
     end
@@ -119,8 +169,62 @@ defmodule Cix.IR do
     Process.delete(:current_ir)
     result
   end
+  
+  defp find_function(ir, function_name) do
+    # Check global functions first
+    case Enum.find(ir.functions, &(&1.name == function_name)) do
+      nil ->
+        # Check module functions
+        ir.modules
+        |> Enum.flat_map(& &1.functions)
+        |> Enum.find(&(&1.name == function_name))
+      function -> function
+    end
+  end
 
   # Private helper functions for C code generation
+
+  defp generate_c_modules(ir) do
+    # Generate header declarations for all exported functions
+    headers = generate_module_headers(ir.modules)
+    
+    # Generate implementation for all modules
+    implementations = ir.modules
+    |> Enum.reverse()
+    |> Enum.map(&generate_c_module/1)
+    |> Enum.join("\n\n")
+    
+    [headers, implementations]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n\n")
+  end
+
+  defp generate_module_headers(modules) do
+    modules
+    |> Enum.flat_map(&generate_module_header/1)
+    |> Enum.join("\n")
+  end
+
+  defp generate_module_header(module) do
+    # Generate forward declarations for exported functions
+    module.functions
+    |> Enum.filter(&(&1.name in module.exports))
+    |> Enum.map(fn func ->
+      params_str = generate_c_params(func.params)
+      "#{func.return_type} #{func.name}(#{params_str});"
+    end)
+  end
+
+  defp generate_c_module(module) do
+    comment = "// Module: #{module.name}"
+    structs_code = generate_c_structs(module.structs)
+    variables_code = generate_c_variables(module.variables)
+    functions_code = generate_c_functions(module.functions, module.variables)
+    
+    [comment, structs_code, variables_code, functions_code]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n\n")
+  end
 
   defp generate_c_structs([]), do: ""
   defp generate_c_structs(structs) do
@@ -325,7 +429,7 @@ defmodule Cix.IR do
         end
       _ ->
         # Try to find and call function from IR
-        case Enum.find(ir.functions, &(&1.name == func_name)) do
+        case find_function(ir, func_name) do
           nil -> {:error, "Function #{func_name} not found"}
           function ->
             evaluated_args = Enum.map(args, &evaluate_expression/1)
@@ -361,7 +465,7 @@ defmodule Cix.IR do
     case Process.get(:current_ir) do
       nil -> 0  # Fallback if no IR context available
       ir ->
-        case Enum.find(ir.functions, &(&1.name == func_name)) do
+        case find_function(ir, func_name) do
           nil -> 0  # Function not found
           function ->
             evaluated_args = Enum.map(args, &evaluate_expression/1)

@@ -35,10 +35,47 @@ defmodule Cix.Macro do
   """
   defmacro c_program(do: block) do
     quote do
-      import Cix.Macro, only: [let: 1, defn: 2, return: 1, struct: 2]
+      import Cix.Macro, only: [let: 1, defn: 2, return: 1, struct: 2, c_module: 2]
       var!(ir) = Cix.IR.new()
       unquote(transform_block(block))
       var!(ir)
+    end
+  end
+
+  @doc """
+  Macro for defining a module with exports and imports.
+  
+  Example:
+      c_module :math_utils, exports: [:add, :multiply] do
+        defn add(x :: int, y :: int) :: int do
+          return x + y
+        end
+        
+        defn multiply(x :: int, y :: int) :: int do
+          return x * y
+        end
+      end
+  """
+  defmacro c_module(name, opts \\ [], do: block) do
+    exports = Keyword.get(opts, :exports, [])
+    imports = Keyword.get(opts, :imports, [])
+    
+    quote do
+      # Create temporary IR for module content
+      var!(module_ir) = Cix.IR.new()
+      unquote(transform_block(block))
+      
+      # Extract module content
+      module_variables = var!(module_ir).variables
+      module_functions = var!(module_ir).functions  
+      module_structs = var!(module_ir).structs
+      
+      # Convert exports and imports to strings
+      exports_list = unquote(exports) |> Enum.map(&to_string/1)
+      imports_list = unquote(build_module_imports(imports))
+      
+      # Add module to main IR
+      var!(ir) = Cix.IR.add_module(var!(ir), unquote(to_string(name)), exports_list, imports_list, module_variables, module_functions, module_structs)
     end
   end
 
@@ -152,6 +189,58 @@ defmodule Cix.Macro do
     quote do
       body_list = unquote(transform_function_body(body))
       var!(ir) = Cix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), [], body_list)
+    end
+  end
+
+  # Handle c_module statement
+  defp transform_statement({:c_module, _, [name, opts, [do: block]]}) do
+    exports = Keyword.get(opts, :exports, [])
+    imports = Keyword.get(opts, :imports, [])
+    
+    quote do
+      # Create temporary IR for module content
+      var!(module_ir) = Cix.IR.new()
+      # Switch context to module IR temporarily
+      var!(old_ir) = var!(ir)
+      var!(ir) = var!(module_ir)
+      unquote(transform_block(block))
+      
+      # Extract module content
+      module_variables = var!(ir).variables
+      module_functions = var!(ir).functions  
+      module_structs = var!(ir).structs
+      
+      # Restore original IR
+      var!(ir) = var!(old_ir)
+      
+      # Convert exports and imports to strings
+      exports_list = unquote(exports) |> Enum.map(&to_string/1)
+      imports_list = unquote(build_module_imports(imports))
+      
+      # Add module to main IR
+      var!(ir) = Cix.IR.add_module(var!(ir), unquote(to_string(name)), exports_list, imports_list, module_variables, module_functions, module_structs)
+    end
+  end
+
+  defp transform_statement({:c_module, _, [name, [do: block]]}) do
+    quote do
+      # Create temporary IR for module content
+      var!(module_ir) = Cix.IR.new()
+      # Switch context to module IR temporarily
+      var!(old_ir) = var!(ir)
+      var!(ir) = var!(module_ir)
+      unquote(transform_block(block))
+      
+      # Extract module content
+      module_variables = var!(ir).variables
+      module_functions = var!(ir).functions  
+      module_structs = var!(ir).structs
+      
+      # Restore original IR
+      var!(ir) = var!(old_ir)
+      
+      # Add module to main IR with no exports/imports
+      var!(ir) = Cix.IR.add_module(var!(ir), unquote(to_string(name)), [], [], module_variables, module_functions, module_structs)
     end
   end
 
@@ -280,4 +369,16 @@ defmodule Cix.Macro do
       _ -> "int"
     end
   end
+
+  defp build_module_imports(imports) when is_list(imports) do
+    imports
+    |> Enum.map(fn
+      {module_name, functions} when is_list(functions) ->
+        quote do: %{module_name: unquote(to_string(module_name)), functions: unquote(functions) |> Enum.map(&to_string/1)}
+      module_name when is_atom(module_name) ->
+        quote do: %{module_name: unquote(to_string(module_name)), functions: []}
+    end)
+  end
+
+  defp build_module_imports(_), do: []
 end
