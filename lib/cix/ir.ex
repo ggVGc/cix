@@ -103,6 +103,25 @@ defmodule Cix.IR do
   end
 
   @doc """
+  Merge multiple IR instances into a single IR.
+  Functions, variables, and structs are combined.
+  """
+  def merge(irs) when is_list(irs) do
+    Enum.reduce(irs, new(), fn ir, acc ->
+      %{acc |
+        variables: acc.variables ++ ir.variables,
+        functions: acc.functions ++ ir.functions,
+        structs: acc.structs ++ ir.structs,
+        modules: acc.modules ++ ir.modules
+      }
+    end)
+  end
+
+  def merge(ir1, ir2) do
+    merge([ir1, ir2])
+  end
+
+  @doc """
   Convert IR to C code.
   """
   def to_c_code(%__MODULE__{} = ir) do
