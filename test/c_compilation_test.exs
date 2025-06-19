@@ -14,17 +14,17 @@ defmodule CCompilationTest do
         
         var :global_count, :int, 0
         
-        function :calculate_area, :int, [width: :int, height: :int] do
+        defn calculate_area(width :: int, height :: int) :: int do
           area = width * height
           return area
         end
         
-        function :point_sum, :int, [x: :int, y: :int] do
+        defn point_sum(x :: int, y :: int) :: int do
           result = x + y
           return result
         end
         
-        function :main, :int do
+        defn main() :: int do
           width = 10
           height = 5
           area = calculate_area(width, height)
@@ -101,13 +101,13 @@ defmodule CCompilationTest do
 
     test "compiles simple arithmetic program" do
       ir = c_program do
-        function :calculate, :int, [a: :int, b: :int] do
+        defn calculate(a :: int, b :: int) :: int do
           sum = a + b
           product = a * b
           return sum + product
         end
         
-        function :main, :int do
+        defn main() :: int do
           result = calculate(5, 3)
           printf("5 + 3 + (5 * 3) = %d\\n", result)
           return 0

@@ -23,7 +23,7 @@ defmodule Frix.MacroTest do
 
     test "generates IR and C code for function without parameters" do
       ir = c_program do
-        function :get_answer, :int do
+        defn get_answer() :: int do
           return 42
         end
       end
@@ -43,7 +43,7 @@ defmodule Frix.MacroTest do
 
     test "generates IR and C code for function with parameters" do
       ir = c_program do
-        function :add, :int, [x: :int, y: :int] do
+        defn add(x :: int, y :: int) :: int do
           return x + y
         end
       end
@@ -60,7 +60,7 @@ defmodule Frix.MacroTest do
 
     test "generates IR and C code for function with assignments" do
       ir = c_program do
-        function :calculate, :int do
+        defn calculate() :: int do
           result = 10
           result = result * 2
           return result
@@ -81,7 +81,7 @@ defmodule Frix.MacroTest do
 
     test "generates IR and C code for function with function calls" do
       ir = c_program do
-        function :main, :int do
+        defn main() :: int do
           printf("Hello World!")
           return 0
         end
@@ -100,11 +100,11 @@ defmodule Frix.MacroTest do
       ir = c_program do
         var :global_counter, :int, 0
         
-        function :increment, :void do
+        defn increment() :: void do
           global_counter = global_counter + 1
         end
         
-        function :main, :int do
+        defn main() :: int do
           increment()
           printf("Counter: %d\\n", global_counter)
           return 0
@@ -129,11 +129,11 @@ defmodule Frix.MacroTest do
       ir = c_program do
         var :counter, :int, 5
         
-        function :add, :int, [x: :int, y: :int] do
+        defn add(x :: int, y :: int) :: int do
           return x + y
         end
         
-        function :main, :int do
+        defn main() :: int do
           result = counter + 3
           return result
         end
@@ -145,7 +145,7 @@ defmodule Frix.MacroTest do
 
     test "handles arithmetic expressions in IR" do
       ir = c_program do
-        function :math_ops, :int, [a: :int, b: :int] do
+        defn math_ops(a :: int, b :: int) :: int do
           sum = a + b
           diff = a - b
           product = a * b

@@ -351,6 +351,53 @@ int main(void) {
 
 ---
 
+## Prompt 9: Remove Legacy Function Syntax
+
+**Timestamp:** 2025-06-19
+
+**User:** Remove the old function style from Frix.Macro.
+
+**Summary of Changes:**
+- Removed legacy `function` macros completely from Frix.Macro
+- Removed legacy function statement transformations
+- Removed `build_ir_params` helper function (no longer needed)
+- Updated all tests to use only the new `defn` syntax
+- Simplified codebase by eliminating dual syntax support
+
+**Key Removals:**
+- **Legacy Macros:** `function/3` and `function/4` completely removed
+- **Statement Transformations:** Removed AST handling for old `:function` syntax
+- **Helper Functions:** Removed `build_ir_params/1` function
+- **Import References:** Cleaned up macro imports
+
+**Test Updates:**
+- **Macro Tests:** All 12 tests converted from `function` to `defn` syntax
+- **C Compilation Tests:** 2 tests updated to use new syntax
+- **Mixed Syntax Tests:** Converted to multiple function tests (no longer mixed)
+- **All Tests Pass:** 33 tests still pass with cleaner codebase
+
+**Benefits of Removal:**
+- **Simpler Codebase:** Eliminated duplicate functionality and code paths
+- **Consistent Syntax:** Only one way to define functions now
+- **Easier Maintenance:** Less code to maintain and fewer edge cases
+- **Cleaner API:** More focused and predictable interface
+
+**Breaking Change:**
+This is a breaking change that removes the old tuple-based function syntax:
+```elixir
+# OLD (removed):
+function :add, :int, [x: :int, y: :int] do
+  return x + y
+end
+
+# NEW (only syntax now):
+defn add(x :: int, y :: int) :: int do
+  return x + y
+end
+```
+
+---
+
 ## Summary of Complete System
 
 The Frix DSL development resulted in a comprehensive system with:

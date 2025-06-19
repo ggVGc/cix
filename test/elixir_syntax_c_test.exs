@@ -85,26 +85,24 @@ defmodule ElixirSyntaxCTest do
       end
     end
 
-    test "mixed syntax compiles correctly" do
+    test "multiple functions compile correctly" do
       ir = c_program do
         var :counter, :int, 0
         
-        # Old syntax
-        function :old_style, :int, [x: :int] do
+        defn double_value(x :: int) :: int do
           return x * 2
         end
         
-        # New syntax
-        defn new_style(y :: int) :: int do
+        defn triple_value(y :: int) :: int do
           return y * 3
         end
         
         defn main() :: int do
-          old_result = old_style(5)
-          new_result = new_style(4)
-          total = old_result + new_result
+          doubled = double_value(5)
+          tripled = triple_value(4)
+          total = doubled + tripled
           
-          printf("Old style: %d, New style: %d, Total: %d\\n", old_result, new_result, total)
+          printf("Doubled: %d, Tripled: %d, Total: %d\\n", doubled, tripled, total)
           return 0
         end
       end
@@ -118,8 +116,8 @@ defmodule ElixirSyntaxCTest do
       """
       
       temp_dir = System.tmp_dir!()
-      c_file = Path.join(temp_dir, "frix_mixed_#{:rand.uniform(10000)}.c")
-      binary_file = Path.join(temp_dir, "frix_mixed_#{:rand.uniform(10000)}")
+      c_file = Path.join(temp_dir, "frix_multiple_#{:rand.uniform(10000)}.c")
+      binary_file = Path.join(temp_dir, "frix_multiple_#{:rand.uniform(10000)}")
       
       try do
         File.write!(c_file, full_c_code)
@@ -135,7 +133,7 @@ defmodule ElixirSyntaxCTest do
         {output, exit_code} = System.cmd(binary_file, [])
         
         assert exit_code == 0
-        assert output =~ "Old style: 10, New style: 12, Total: 22"
+        assert output =~ "Doubled: 10, Tripled: 12, Total: 22"
         
       after
         File.rm(c_file)

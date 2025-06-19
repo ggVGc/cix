@@ -80,23 +80,6 @@ defmodule Frix.Macro do
     end
   end
 
-  # Legacy support for old function syntax
-  @doc false
-  defmacro function(name, return_type, params, do: body) do
-    quote do
-      params_list = unquote(build_ir_params(params))
-      body_list = unquote(transform_function_body(body))
-      var!(ir) = Frix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(to_string(return_type)), params_list, body_list)
-    end
-  end
-
-  @doc false
-  defmacro function(name, return_type, do: body) do
-    quote do
-      body_list = unquote(transform_function_body(body))
-      var!(ir) = Frix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(to_string(return_type)), [], body_list)
-    end
-  end
 
   @doc """
   Adds a struct definition to the current IR context.
@@ -164,31 +147,9 @@ defmodule Frix.Macro do
     end
   end
 
-  # Legacy function syntax support
-  defp transform_statement({:function, _, [name, return_type, params, [do: body]]}) do
-    quote do
-      params_list = unquote(build_ir_params(params))
-      body_list = unquote(transform_function_body(body))
-      var!(ir) = Frix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(to_string(return_type)), params_list, body_list)
-    end
-  end
-
-  defp transform_statement({:function, _, [name, return_type, [do: body]]}) do
-    quote do
-      body_list = unquote(transform_function_body(body))
-      var!(ir) = Frix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(to_string(return_type)), [], body_list)
-    end
-  end
 
   defp transform_statement(stmt) do
     stmt
-  end
-
-  defp build_ir_params(params) when is_list(params) do
-    params
-    |> Enum.map(fn {name, type} ->
-      quote do: %{name: unquote(to_string(name)), type: unquote(to_string(type))}
-    end)
   end
 
   defp build_elixir_params(params) when is_list(params) do

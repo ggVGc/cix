@@ -118,34 +118,32 @@ defmodule Frix.ElixirSyntaxTest do
     end
   end
 
-  describe "mixed syntax compatibility" do
-    test "old function syntax and new defn syntax work together" do
+  describe "multiple functions compatibility" do
+    test "multiple defn functions work together" do
       ir = c_program do
         var :counter, :int, 0
         
-        # Old syntax
-        function :old_increment, :void do
+        defn increment_by_one() :: void do
           counter = counter + 1
         end
         
-        # New syntax
-        defn new_increment() :: void do
-          counter = counter + 1
+        defn increment_by_two() :: void do
+          counter = counter + 2
         end
         
         defn main() :: int do
-          old_increment()
-          new_increment()
+          increment_by_one()
+          increment_by_two()
           return counter
         end
       end
 
       {:ok, result} = Frix.IR.execute(ir, "main")
-      assert result == 2
+      assert result == 3
       
       c_code = Frix.IR.to_c_code(ir)
-      assert c_code =~ "void old_increment(void) {"
-      assert c_code =~ "void new_increment(void) {"
+      assert c_code =~ "void increment_by_one(void) {"
+      assert c_code =~ "void increment_by_two(void) {"
     end
   end
 end
