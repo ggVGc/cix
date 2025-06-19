@@ -14,30 +14,28 @@ defmodule Cix.DSLModules.MathLib do
   def get_dsl_exports, do: [:add, :subtract, :multiply, :divide, :power]
   
   def get_dsl_functions do
-    import Cix.Macro
-    
     [
-      quote do
+      dsl_function do
         defn add(x :: int, y :: int) :: int do
           return x + y
         end
       end,
-      quote do
+      dsl_function do
         defn subtract(x :: int, y :: int) :: int do
           return x - y
         end
       end,
-      quote do
+      dsl_function do
         defn multiply(x :: int, y :: int) :: int do
           return x * y
         end
       end,
-      quote do
+      dsl_function do
         defn divide(x :: int, y :: int) :: int do
           return x / y
         end
       end,
-      quote do
+      dsl_function do
         defn power(base :: int, exp :: int) :: int do
           result = multiply(base, base)
           return result

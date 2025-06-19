@@ -66,6 +66,8 @@ defmodule Cix.DSLModule do
       @before_compile Cix.DSLModule
       @imported_dsl_modules []
       
+      import Cix.DSLModule, only: [dsl_function: 1]
+      
       def get_dsl_exports, do: []
       def get_dsl_functions, do: []
       
@@ -98,34 +100,20 @@ defmodule Cix.DSLModule do
       end
 
       def create_ir do
-        # Simple approach: create minimal functions based on exported names
-        exports = get_dsl_exports()
-        imported_modules = get_imported_modules()
+        # Get all function ASTs
+        all_functions = get_all_dsl_functions()
         
-        ir = Cix.IR.new()
-        
-        # Add functions from imported modules first
-        ir_with_imports = Enum.reduce(imported_modules, ir, fn module, acc ->
-          if function_exported?(module, :create_ir, 0) do
-            imported_ir = module.create_ir()
-            %{acc | functions: acc.functions ++ imported_ir.functions}
-          else
-            acc
+        # Create the c_program AST
+        program_ast = quote do
+          import Cix.Macro
+          c_program do
+            unquote_splicing(all_functions)
           end
-        end)
+        end
         
-        # Add own functions based on exports (simplified)
-        final_ir = Enum.reduce(exports, ir_with_imports, fn export_name, acc ->
-          function = %{
-            name: to_string(export_name),
-            params: [%{name: "x", type: "int"}, %{name: "y", type: "int"}],  # Default params
-            return_type: "int",
-            body: []
-          }
-          %{acc | functions: [function | acc.functions]}
-        end)
-        
-        final_ir
+        # Evaluate the AST to get the IR
+        {ir, _} = Code.eval_quoted(program_ast)
+        ir
       end
 
       defmacro __using__(_opts) do
@@ -173,6 +161,36 @@ defmodule Cix.DSLModule do
       end
     else
       {:error, "#{module} is not a valid DSL module"}
+    end
+  end
+
+  @doc """
+  Helper macro for defining a single DSL function with less boilerplate.
+  
+  Instead of writing:
+      quote do
+        defn add(x :: int, y :: int) :: int do
+          return x + y
+        end
+      end
+  
+  You can write:
+      dsl_function do
+        defn add(x :: int, y :: int) :: int do
+          return x + y
+        end
+      end
+  
+  This macro automatically wraps the function definition in the required quote block.
+  """
+  defmacro dsl_function(do: ast) do
+    quoted_ast = quote do
+      import Cix.Macro
+      unquote(ast)
+    end
+    
+    quote do
+      unquote(Macro.escape(quoted_ast))
     end
   end
 end
