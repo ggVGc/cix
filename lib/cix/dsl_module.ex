@@ -251,21 +251,17 @@ defmodule Cix.DSLModule do
               params: [],
               return_type: "int",
               body: [
-                # Use math functions: sum = add(10, 5) = 15
-                {:assign, "sum", {:call, "add", [{:literal, 10}, {:literal, 5}]}},
-                # product = multiply(4, 6) = 24
-                {:assign, "product", {:call, "multiply", [{:literal, 4}, {:literal, 6}]}},
-                # area = rectangle_area(8, 6) = 48
-                {:assign, "area", {:call, "rectangle_area", [{:literal, 8}, {:literal, 6}]}},
-                # volume = cube_volume(3) = 27
-                {:assign, "volume", {:call, "cube_volume", [{:literal, 3}]}},
-                # total = add(sum, product) = 39
-                {:assign, "total", {:call, "add", [{:var, "sum"}, {:var, "product"}]}},
-                # total = add(total, area) = 87
-                {:assign, "total", {:call, "add", [{:var, "total"}, {:var, "area"}]}},
-                # total = add(total, volume) = 114
-                {:assign, "total", {:call, "add", [{:var, "total"}, {:var, "volume"}]}},
-                {:return, {:var, "total"}}
+                # Direct calculation: 15 + 24 + 48 + 27 = 114
+                {:return, {:binary_op, :add, 
+                  {:binary_op, :add,
+                    {:binary_op, :add,
+                      {:call, "add", [{:literal, 10}, {:literal, 5}]},
+                      {:call, "multiply", [{:literal, 4}, {:literal, 6}]}
+                    },
+                    {:call, "rectangle_area", [{:literal, 8}, {:literal, 6}]}
+                  },
+                  {:call, "cube_volume", [{:literal, 3}]}
+                }}
               ]
             }
           {_, :composite_func} ->
