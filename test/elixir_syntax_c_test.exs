@@ -122,7 +122,7 @@ defmodule ElixirSyntaxCTest do
       try do
         File.write!(c_file, full_c_code)
         
-        {result, exit_code} = System.cmd("gcc", ["-o", binary_file, c_file], stderr_to_stdout: true)
+        {_result, exit_code} = System.cmd("gcc", ["-o", binary_file, c_file], stderr_to_stdout: true)
         
         if exit_code != 0 do
           IO.puts("Generated C code:")

@@ -302,13 +302,24 @@ defmodule Frix.IR do
   defp execute_statement(ir, {:call, func_name, args}) do
     case func_name do
       "printf" ->
-        # Handle printf specially for demo purposes
+        # Handle printf specially for demo purposes - simplified version
         evaluated_args = Enum.map(args, &evaluate_expression/1)
         case evaluated_args do
           [format | [_ | _] = values] -> 
-            IO.puts(:io_lib.format(to_charlist(format), values))
+            # For testing purposes, just use Elixir's printf-like formatting
+            try do
+              # Convert C format specifiers to Elixir format
+              elixir_format = String.replace(format, ~r/%[dld]/, "~w")
+              |> String.replace("\\n", "\n")
+              IO.puts(:io_lib.format(to_charlist(elixir_format), values))
+            rescue
+              _ ->
+                # Fallback: just print format and values
+                IO.puts("#{format} [#{Enum.join(values, ", ")}]")
+            end
           [format] -> 
-            IO.puts(format)
+            formatted = String.replace(format, "\\n", "\n")
+            IO.puts(formatted)
           [] -> 
             IO.puts("")
         end
