@@ -104,3 +104,74 @@ end
 
 **Result**: The helper macro successfully reduces boilerplate and makes DSL module definitions cleaner and more readable. All DSL modules now use the improved syntax, and most tests are passing.
 
+### Automatic Export Detection Implementation (Current)
+
+**Request**: Implement automatic export detection described in improvements suggestion.
+
+**Summary**: Successfully implemented automatic export detection that:
+1. Automatically extracts function names from `dsl_function` definitions
+2. Generates `get_dsl_exports` list without manual specification
+3. Provides option to disable auto-export (`auto_export: false`)
+4. Combines auto-detected exports with manually defined ones
+5. Works seamlessly with module composition and imports
+
+**Implementation**:
+- Enhanced `__using__` macro to accept `auto_export` option (defaults to `true`)
+- Added AST analysis functions to extract function names from quoted DSL functions
+- Modified `__before_compile__` hook to auto-generate `get_dsl_exports` when enabled
+- Updated all existing DSL modules to use auto-export
+
+**Before**:
+```elixir
+defmodule MyMathLib do
+  use Cix.DSLModule
+  
+  def get_dsl_exports, do: [:add, :multiply]  # Manual specification
+  
+  def get_dsl_functions do
+    [
+      dsl_function do
+        defn add(x :: int, y :: int) :: int do
+          return x + y
+        end
+      end,
+      dsl_function do
+        defn multiply(x :: int, y :: int) :: int do
+          return x * y
+        end
+      end
+    ]
+  end
+end
+```
+
+**After**:
+```elixir
+defmodule MyMathLib do
+  use Cix.DSLModule, auto_export: true  # Auto-detects [:add, :multiply]
+  
+  def get_dsl_functions do
+    [
+      dsl_function do
+        defn add(x :: int, y :: int) :: int do
+          return x + y
+        end
+      end,
+      dsl_function do
+        defn multiply(x :: int, y :: int) :: int do
+          return x * y
+        end
+      end
+    ]
+  end
+end
+```
+
+**Benefits**:
+- **Zero boilerplate**: No need to manually maintain export lists
+- **Automatic synchronization**: Exports always match actual function definitions
+- **Error prevention**: Eliminates mismatches between defined and exported functions
+- **Backward compatible**: Existing modules work unchanged with `auto_export: false`
+
+**Result**: Automatic export detection significantly improves DSL module usability by eliminating manual export list maintenance while preserving all existing functionality.
+

@@ -9,9 +9,7 @@ defmodule Cix.DSLModules.MathLib do
   Exports: add, subtract, multiply, divide, power
   """
   
-  use Cix.DSLModule
-  
-  def get_dsl_exports, do: [:add, :subtract, :multiply, :divide, :power]
+  use Cix.DSLModule, auto_export: true
   
   def get_dsl_functions do
     [

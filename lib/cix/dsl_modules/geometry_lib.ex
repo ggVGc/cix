@@ -10,10 +10,8 @@ defmodule Cix.DSLModules.GeometryLib do
   Exports: rectangle_area, rectangle_perimeter, circle_area_approx, cube_volume
   """
   
-  use Cix.DSLModule
+  use Cix.DSLModule, auto_export: true
   use Cix.DSLModules.MathLib
-  
-  def get_dsl_exports, do: [:rectangle_area, :rectangle_perimeter, :circle_area_approx, :cube_volume]
   
   def get_dsl_functions do
     [

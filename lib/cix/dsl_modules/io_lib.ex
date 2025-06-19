@@ -8,9 +8,7 @@ defmodule Cix.DSLModules.IOLib do
   Exports: print_int, print_two_ints, print_calculation_result
   """
   
-  use Cix.DSLModule
-  
-  def get_dsl_exports, do: [:print_int, :print_two_ints, :print_calculation_result]
+  use Cix.DSLModule, auto_export: true
   
   def get_dsl_functions do
     [

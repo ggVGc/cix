@@ -61,10 +61,13 @@ defmodule Cix.DSLModule do
   """
 
   @doc false
-  defmacro __using__(_opts) do
+  defmacro __using__(opts) do
+    auto_export = Keyword.get(opts, :auto_export, true)
+    
     quote do
       @before_compile Cix.DSLModule
       @imported_dsl_modules []
+      @dsl_auto_export unquote(auto_export)
       
       import Cix.DSLModule, only: [dsl_function: 1]
       
@@ -79,6 +82,7 @@ defmodule Cix.DSLModule do
   defmacro __before_compile__(env) do
     module = env.module
     imported_modules = Module.get_attribute(env.module, :imported_dsl_modules, [])
+    auto_export = Module.get_attribute(env.module, :dsl_auto_export, true)
     
     quote do
       def get_imported_modules, do: unquote(imported_modules)
@@ -114,6 +118,23 @@ defmodule Cix.DSLModule do
         # Evaluate the AST to get the IR
         {ir, _} = Code.eval_quoted(program_ast)
         ir
+      end
+      
+      # Auto-generate exports if enabled
+      if unquote(auto_export) do
+        defoverridable get_dsl_exports: 0
+        
+        def get_dsl_exports do
+          # Extract function names from DSL function ASTs
+          auto_exports = get_dsl_functions()
+          |> Enum.map(&Cix.DSLModule.extract_function_name_from_ast/1)
+          |> Enum.reject(&is_nil/1)
+          
+          # Combine with manually defined ones (if any)
+          manual_exports = super()
+          
+          Enum.uniq(auto_exports ++ manual_exports)
+        end
       end
 
       defmacro __using__(_opts) do
@@ -181,7 +202,8 @@ defmodule Cix.DSLModule do
         end
       end
   
-  This macro automatically wraps the function definition in the required quote block.
+  This macro automatically wraps the function definition in the required quote block
+  and extracts the function name for automatic export detection.
   """
   defmacro dsl_function(do: ast) do
     quoted_ast = quote do
@@ -193,4 +215,32 @@ defmodule Cix.DSLModule do
       unquote(Macro.escape(quoted_ast))
     end
   end
+
+  @doc """
+  Extracts function names from DSL function AST for auto-export.
+  """
+  def extract_function_name({:defn, _, [{:"::", _, [{name, _, _}, _]}, _]}) when is_atom(name) do
+    name
+  end
+  
+  def extract_function_name(_), do: nil
+
+  @doc """
+  Extracts function names from quoted DSL function ASTs.
+  """
+  def extract_function_name_from_ast({:quote, _, [[do: ast]]}) do
+    extract_function_name_from_inner_ast(ast)
+  end
+  
+  def extract_function_name_from_ast({:__block__, _, [_, ast]}) do
+    extract_function_name_from_inner_ast(ast)
+  end
+  
+  def extract_function_name_from_ast(_), do: nil
+
+  defp extract_function_name_from_inner_ast({:defn, _, [{:"::", _, [{name, _, _}, _]}, _]}) when is_atom(name) do
+    name
+  end
+  
+  defp extract_function_name_from_inner_ast(_), do: nil
 end
