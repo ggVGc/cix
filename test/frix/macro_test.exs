@@ -3,8 +3,8 @@ defmodule Frix.MacroTest do
   require Frix.Macro
   import Frix.Macro
 
-  describe "c_program macro with IR output" do
-    test "generates IR for simple program with variables" do
+  describe "c_program macro IR generation" do
+    test "generates correct IR for variables" do
       ir = c_program do
         let count :: int = 42
         let max_size :: long = 1024
@@ -12,16 +12,19 @@ defmodule Frix.MacroTest do
 
       assert %Frix.IR{} = ir
       assert length(ir.variables) == 2
-      assert Enum.any?(ir.variables, &(&1.name == "count" and &1.value == {:literal, 42}))
-      assert Enum.any?(ir.variables, &(&1.name == "max_size" and &1.value == {:literal, 1024}))
       
-      # Test C code generation
-      c_code = Frix.IR.to_c_code(ir)
-      assert c_code =~ "int count = 42;"
-      assert c_code =~ "long max_size = 1024;"
+      count_var = Enum.find(ir.variables, &(&1.name == "count"))
+      assert count_var.name == "count"
+      assert count_var.type == "int"
+      assert count_var.value == {:literal, 42}
+      
+      max_size_var = Enum.find(ir.variables, &(&1.name == "max_size"))
+      assert max_size_var.name == "max_size"
+      assert max_size_var.type == "long"
+      assert max_size_var.value == {:literal, 1024}
     end
 
-    test "generates IR and C code for function without parameters" do
+    test "generates correct IR for function without parameters" do
       ir = c_program do
         defn get_answer() :: int do
           return 42
@@ -34,14 +37,13 @@ defmodule Frix.MacroTest do
       assert func.name == "get_answer"
       assert func.return_type == "int"
       assert func.params == []
+      assert length(func.body) == 1
       
-      c_code = Frix.IR.to_c_code(ir)
-      assert c_code =~ "int get_answer(void) {"
-      assert c_code =~ "    return 42;"
-      assert c_code =~ "}"
+      [{:return, return_expr}] = func.body
+      assert return_expr == {:literal, 42}
     end
 
-    test "generates IR and C code for function with parameters" do
+    test "generates correct IR for function with parameters" do
       ir = c_program do
         defn add(x :: int, y :: int) :: int do
           return x + y
@@ -50,15 +52,19 @@ defmodule Frix.MacroTest do
 
       assert %Frix.IR{} = ir
       [func] = ir.functions
+      assert func.name == "add"
+      assert func.return_type == "int"
       assert length(func.params) == 2
       
-      c_code = Frix.IR.to_c_code(ir)
-      assert c_code =~ "int add(int x, int y) {"
-      assert c_code =~ "    return x + y;"
-      assert c_code =~ "}"
+      [param1, param2] = func.params
+      assert param1.name == "x" and param1.type == "int"
+      assert param2.name == "y" and param2.type == "int"
+      
+      [{:return, return_expr}] = func.body
+      assert return_expr == {:binary_op, :add, {:var, "x"}, {:var, "y"}}
     end
 
-    test "generates IR and C code for function with assignments" do
+    test "generates correct IR for function with assignments" do
       ir = c_program do
         defn calculate() :: int do
           result = 10
@@ -69,17 +75,18 @@ defmodule Frix.MacroTest do
 
       assert %Frix.IR{} = ir
       [func] = ir.functions
+      assert func.name == "calculate"
+      assert func.return_type == "int"
+      assert func.params == []
       assert length(func.body) == 3
       
-      c_code = Frix.IR.to_c_code(ir)
-      assert c_code =~ "int calculate(void) {"
-      assert c_code =~ "    result = 10;"
-      assert c_code =~ "    result = result * 2;"
-      assert c_code =~ "    return result;"
-      assert c_code =~ "}"
+      [stmt1, stmt2, stmt3] = func.body
+      assert stmt1 == {:assign, "result", {:literal, 10}}
+      assert stmt2 == {:assign, "result", {:binary_op, :mul, {:var, "result"}, {:literal, 2}}}
+      assert stmt3 == {:return, {:var, "result"}}
     end
 
-    test "generates IR and C code for function with function calls" do
+    test "generates correct IR for function with function calls" do
       ir = c_program do
         defn main() :: int do
           printf("Hello World!")
@@ -88,15 +95,18 @@ defmodule Frix.MacroTest do
       end
 
       assert %Frix.IR{} = ir
+      [func] = ir.functions
+      assert func.name == "main"
+      assert func.return_type == "int"
+      assert func.params == []
+      assert length(func.body) == 2
       
-      c_code = Frix.IR.to_c_code(ir)
-      assert c_code =~ "int main(void) {"
-      assert c_code =~ "    printf(\"Hello World!\");"
-      assert c_code =~ "    return 0;"
-      assert c_code =~ "}"
+      [call_stmt, return_stmt] = func.body
+      assert call_stmt == {:call, "printf", [{:literal, "Hello World!"}]}
+      assert return_stmt == {:return, {:literal, 0}}
     end
 
-    test "generates complete IR and C program" do
+    test "generates correct IR for complete program with variables and functions" do
       ir = c_program do
         let global_counter :: int = 0
         
@@ -115,14 +125,28 @@ defmodule Frix.MacroTest do
       assert length(ir.variables) == 1
       assert length(ir.functions) == 2
       
-      c_code = Frix.IR.to_c_code(ir)
-      assert c_code =~ "int global_counter = 0;"
-      assert c_code =~ "void increment(void) {"
-      assert c_code =~ "global_counter = global_counter + 1;"
-      assert c_code =~ "int main(void) {"
-      assert c_code =~ "increment();"
-      assert c_code =~ "printf(\"Counter: %d\\n\", global_counter);"
-      assert c_code =~ "return 0;"
+      # Verify variable
+      [var] = ir.variables
+      assert var.name == "global_counter"
+      assert var.type == "int"
+      assert var.value == {:literal, 0}
+      
+      # Verify increment function
+      increment_func = Enum.find(ir.functions, &(&1.name == "increment"))
+      assert increment_func.return_type == "void"
+      assert increment_func.params == []
+      [assign_stmt] = increment_func.body
+      assert assign_stmt == {:assign, "global_counter", {:binary_op, :add, {:var, "global_counter"}, {:literal, 1}}}
+      
+      # Verify main function
+      main_func = Enum.find(ir.functions, &(&1.name == "main"))
+      assert main_func.return_type == "int"
+      assert main_func.params == []
+      assert length(main_func.body) == 3
+      [call_increment, call_printf, return_stmt] = main_func.body
+      assert call_increment == {:call, "increment", []}
+      assert call_printf == {:call, "printf", [{:literal, "Counter: %d\\n"}, {:var, "global_counter"}]}
+      assert return_stmt == {:return, {:literal, 0}}
     end
 
     test "can execute IR directly in Elixir" do
@@ -143,7 +167,7 @@ defmodule Frix.MacroTest do
       assert result == 8
     end
 
-    test "handles arithmetic expressions in IR" do
+    test "generates correct IR for arithmetic expressions" do
       ir = c_program do
         defn math_ops(a :: int, b :: int) :: int do
           sum = a + b
@@ -154,46 +178,63 @@ defmodule Frix.MacroTest do
         end
       end
 
-      c_code = Frix.IR.to_c_code(ir)
-      assert c_code =~ "sum = a + b;"
-      assert c_code =~ "diff = a - b;"
-      assert c_code =~ "product = a * b;"
-      assert c_code =~ "quotient = a / b;"
-      assert c_code =~ "return sum + diff + product + quotient;"
+      assert %Frix.IR{} = ir
+      [func] = ir.functions
+      assert func.name == "math_ops"
+      assert func.return_type == "int"
+      assert length(func.params) == 2
+      assert length(func.body) == 5
       
-      # Test execution
+      [sum_stmt, diff_stmt, product_stmt, quotient_stmt, return_stmt] = func.body
+      assert sum_stmt == {:assign, "sum", {:binary_op, :add, {:var, "a"}, {:var, "b"}}}
+      assert diff_stmt == {:assign, "diff", {:binary_op, :sub, {:var, "a"}, {:var, "b"}}}
+      assert product_stmt == {:assign, "product", {:binary_op, :mul, {:var, "a"}, {:var, "b"}}}
+      assert quotient_stmt == {:assign, "quotient", {:binary_op, :div, {:var, "a"}, {:var, "b"}}}
+      
+      # Verify complex return expression
+      {:return, return_expr} = return_stmt
+      assert return_expr == {:binary_op, :add, 
+        {:binary_op, :add, 
+          {:binary_op, :add, {:var, "sum"}, {:var, "diff"}}, 
+          {:var, "product"}
+        }, 
+        {:var, "quotient"}
+      }
+      
+      # Test execution still works
       {:ok, result} = Frix.IR.execute(ir, "math_ops", [10, 2])
-      # 10+2 + 10-2 + 10*2 + 10/2 = 12 + 8 + 20 + 5 = 45
       assert result == 45
     end
 
-    test "defines structs and generates C code" do
+    test "generates correct IR for struct definitions" do
       ir = c_program do
         struct :Point, [x: :int, y: :int]
         struct :Rectangle, [top_left: :Point, width: :int, height: :int]
       end
 
-      # Test IR structure
       assert %Frix.IR{} = ir
       assert length(ir.structs) == 2
       
+      # Verify Point struct
       point_struct = Enum.find(ir.structs, &(&1.name == "Point"))
       assert point_struct.name == "Point"
       assert length(point_struct.fields) == 2
-      assert Enum.any?(point_struct.fields, &(&1.name == "x" and &1.type == "int"))
-      assert Enum.any?(point_struct.fields, &(&1.name == "y" and &1.type == "int"))
+      [field1, field2] = point_struct.fields
+      assert field1.name == "x" and field1.type == "int"
+      assert field2.name == "y" and field2.type == "int"
       
-      # Test C code generation
-      c_code = Frix.IR.to_c_code(ir)
-      assert c_code =~ "typedef struct {"
-      assert c_code =~ "    int x;"
-      assert c_code =~ "    int y;"
-      assert c_code =~ "} Point;"
-      assert c_code =~ "} Rectangle;"
+      # Verify Rectangle struct
+      rectangle_struct = Enum.find(ir.structs, &(&1.name == "Rectangle"))
+      assert rectangle_struct.name == "Rectangle"
+      assert length(rectangle_struct.fields) == 3
+      [top_left_field, width_field, height_field] = rectangle_struct.fields
+      assert top_left_field.name == "top_left" and top_left_field.type == "Point"
+      assert width_field.name == "width" and width_field.type == "int"
+      assert height_field.name == "height" and height_field.type == "int"
     end
 
-    test "struct operations work with direct IR construction" do
-      # Test struct creation and field access using IR directly
+    test "verifies IR construction with direct IR module usage" do
+      # Test direct IR construction and verify structure
       import Frix.IR
       
       ir = 
@@ -205,11 +246,21 @@ defmodule Frix.MacroTest do
           {:return, {:binary_op, :add, {:var, "point_x"}, {:var, "point_y"}}}
         ])
 
-      c_code = to_c_code(ir)
-      assert c_code =~ "typedef struct {"
-      assert c_code =~ "    int x;"
-      assert c_code =~ "    int y;"
-      assert c_code =~ "} Point;"
+      # Verify IR structure
+      assert %Frix.IR{} = ir
+      assert length(ir.structs) == 1
+      assert length(ir.functions) == 1
+      
+      # Verify struct
+      [struct_def] = ir.structs
+      assert struct_def.name == "Point"
+      assert length(struct_def.fields) == 2
+      
+      # Verify function
+      [func] = ir.functions
+      assert func.name == "main"
+      assert func.return_type == "int"
+      assert length(func.body) == 3
       
       {:ok, result} = execute(ir, "main")
       assert result == 30

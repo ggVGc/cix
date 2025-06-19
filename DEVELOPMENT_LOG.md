@@ -495,6 +495,78 @@ let count :: int = 42
 
 ---
 
+## Prompt 11: IR-Focused Macro Tests
+
+**Timestamp:** 2025-06-19
+
+**User:** Change macro_test.exs to verify IR instead of generated C code.
+
+**Summary of Changes:**
+- Refactored all macro tests to focus on IR structure verification
+- Removed C code generation assertions from macro tests
+- Added comprehensive IR structure validation
+- Updated test descriptions to reflect IR-focused testing approach
+- Maintained execution tests where relevant
+
+**Key Improvements:**
+
+### **IR Structure Verification:**
+- **Variable Testing:** Direct validation of IR variable fields (name, type, value)
+- **Function Testing:** Comprehensive verification of function parameters, body, and return types
+- **Statement Testing:** Detailed IR statement structure validation
+- **Expression Testing:** In-depth verification of binary operations and expression trees
+
+### **Test Focus Changes:**
+- **Before:** Tests verified both IR structure AND generated C code
+- **After:** Tests focus solely on IR correctness, leaving C generation to dedicated C compilation tests
+- **Benefit:** Cleaner separation of concerns and more targeted test failures
+
+### **Enhanced Assertions:**
+```elixir
+# OLD (mixed IR and C testing):
+assert %Frix.IR{} = ir
+assert length(ir.functions) == 1
+c_code = Frix.IR.to_c_code(ir)
+assert c_code =~ "int add(int x, int y) {"
+
+# NEW (IR-focused):
+assert %Frix.IR{} = ir
+[func] = ir.functions
+assert func.name == "add"
+assert func.return_type == "int"
+[param1, param2] = func.params
+assert param1.name == "x" and param1.type == "int"
+assert param2.name == "y" and param2.type == "int"
+[{:return, return_expr}] = func.body
+assert return_expr == {:binary_op, :add, {:var, "x"}, {:var, "y"}}
+```
+
+### **Detailed IR Validation:**
+- **Variables:** Name, type, and value verification
+- **Functions:** Parameter lists, return types, and body statements
+- **Statements:** Exact IR statement structure matching
+- **Expressions:** Binary operations, literals, and variable references
+- **Structs:** Field definitions and type specifications
+
+### **Benefits:**
+- **Clearer Test Intent:** Each test focuses on specific IR generation aspects
+- **Better Error Messages:** Failures point directly to IR structure issues
+- **Faster Test Execution:** No C code generation during macro testing
+- **Separation of Concerns:** Macro tests verify macro functionality, C tests verify C generation
+
+### **Test Coverage Maintained:**
+- **12 Macro Tests:** All pass with detailed IR verification
+- **Execution Tests:** Kept where they validate IR correctness
+- **Total Tests:** 39 tests still pass, no functionality lost
+
+### **Technical Achievement:**
+This change improves test architecture by creating clear boundaries:
+- **Macro Tests:** Verify AST → IR transformation correctness
+- **C Compilation Tests:** Verify IR → C code generation and compilation
+- **Integration Tests:** Verify end-to-end functionality
+
+---
+
 ## Summary of Complete System
 
 The Frix DSL development resulted in a comprehensive system with:
