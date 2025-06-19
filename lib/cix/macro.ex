@@ -1,4 +1,4 @@
-defmodule Frix.Macro do
+defmodule Cix.Macro do
   @moduledoc """
   Macros for writing DSL expressions with natural Elixir syntax that compiles to C code.
   """
@@ -7,8 +7,8 @@ defmodule Frix.Macro do
   Macro for building DSL with natural Elixir expressions.
   
   Returns an intermediate representation (IR) that can be:
-  - Converted to C code with `Frix.IR.to_c_code/1`
-  - Executed directly in Elixir with `Frix.IR.execute/1`
+  - Converted to C code with `Cix.IR.to_c_code/1`
+  - Executed directly in Elixir with `Cix.IR.execute/1`
   
   Example:
       ir = c_program do
@@ -28,15 +28,15 @@ defmodule Frix.Macro do
       end
       
       # Generate C code
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       
       # Or execute directly
-      {:ok, result} = Frix.IR.execute(ir)
+      {:ok, result} = Cix.IR.execute(ir)
   """
   defmacro c_program(do: block) do
     quote do
-      import Frix.Macro, only: [let: 1, defn: 2, return: 1, struct: 2]
-      var!(ir) = Frix.IR.new()
+      import Cix.Macro, only: [let: 1, defn: 2, return: 1, struct: 2]
+      var!(ir) = Cix.IR.new()
       unquote(transform_block(block))
       var!(ir)
     end
@@ -52,7 +52,7 @@ defmodule Frix.Macro do
   """
   defmacro let({:"::", _, [{name, _, nil}, {:=, _, [{type, _, nil}, value]}]}) do
     quote do
-      var!(ir) = Frix.IR.add_variable(var!(ir), unquote(to_string(name)), unquote(to_string(type)), unquote(transform_ir_expression(value)))
+      var!(ir) = Cix.IR.add_variable(var!(ir), unquote(to_string(name)), unquote(to_string(type)), unquote(transform_ir_expression(value)))
     end
   end
 
@@ -74,7 +74,7 @@ defmodule Frix.Macro do
     quote do
       params_list = unquote(build_elixir_params(params))
       body_list = unquote(transform_function_body(body))
-      var!(ir) = Frix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), params_list, body_list)
+      var!(ir) = Cix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), params_list, body_list)
     end
   end
 
@@ -82,7 +82,7 @@ defmodule Frix.Macro do
     return_type_str = extract_type_string(return_type)
     quote do
       body_list = unquote(transform_function_body(body))
-      var!(ir) = Frix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), [], body_list)
+      var!(ir) = Cix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), [], body_list)
     end
   end
 
@@ -93,7 +93,7 @@ defmodule Frix.Macro do
   defmacro struct(name, fields) do
     quote do
       field_list = unquote(build_ir_fields(fields))
-      var!(ir) = Frix.IR.add_struct(var!(ir), unquote(to_string(name)), field_list)
+      var!(ir) = Cix.IR.add_struct(var!(ir), unquote(to_string(name)), field_list)
     end
   end
 
@@ -125,7 +125,7 @@ defmodule Frix.Macro do
   # Handle new let syntax in statement transformation
   defp transform_statement({:let, _, [{:"::", _, [{name, _, nil}, {:=, _, [{type, _, nil}, value]}]}]}) do
     quote do
-      var!(ir) = Frix.IR.add_variable(var!(ir), unquote(to_string(name)), unquote(to_string(type)), unquote(transform_ir_expression(value)))
+      var!(ir) = Cix.IR.add_variable(var!(ir), unquote(to_string(name)), unquote(to_string(type)), unquote(transform_ir_expression(value)))
     end
   end
 
@@ -133,7 +133,7 @@ defmodule Frix.Macro do
   defp transform_statement({:struct, _, [name, fields]}) do
     quote do
       field_list = unquote(build_ir_fields(fields))
-      var!(ir) = Frix.IR.add_struct(var!(ir), unquote(to_string(name)), field_list)
+      var!(ir) = Cix.IR.add_struct(var!(ir), unquote(to_string(name)), field_list)
     end
   end
 
@@ -143,7 +143,7 @@ defmodule Frix.Macro do
     quote do
       params_list = unquote(build_elixir_params(params))
       body_list = unquote(transform_function_body(body))
-      var!(ir) = Frix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), params_list, body_list)
+      var!(ir) = Cix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), params_list, body_list)
     end
   end
 
@@ -151,7 +151,7 @@ defmodule Frix.Macro do
     return_type_str = extract_type_string(return_type)
     quote do
       body_list = unquote(transform_function_body(body))
-      var!(ir) = Frix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), [], body_list)
+      var!(ir) = Cix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), [], body_list)
     end
   end
 

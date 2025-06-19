@@ -1,6 +1,6 @@
-defmodule Frix do
+defmodule Cix do
   @moduledoc """
-  Documentation for `Frix`.
+  Documentation for `Cix`.
   """
 
   @doc """
@@ -8,7 +8,7 @@ defmodule Frix do
 
   ## Examples
 
-      iex> Frix.hello()
+      iex> Cix.hello()
       :world
 
   """

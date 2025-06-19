@@ -1,7 +1,7 @@
-defmodule Frix.MacroTest do
+defmodule Cix.MacroTest do
   use ExUnit.Case
-  require Frix.Macro
-  import Frix.Macro
+  require Cix.Macro
+  import Cix.Macro
 
   describe "c_program macro IR generation" do
     test "generates correct IR for variables" do
@@ -10,7 +10,7 @@ defmodule Frix.MacroTest do
         let max_size :: long = 1024
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       assert length(ir.variables) == 2
       
       count_var = Enum.find(ir.variables, &(&1.name == "count"))
@@ -31,7 +31,7 @@ defmodule Frix.MacroTest do
         end
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       assert length(ir.functions) == 1
       [func] = ir.functions
       assert func.name == "get_answer"
@@ -50,7 +50,7 @@ defmodule Frix.MacroTest do
         end
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       [func] = ir.functions
       assert func.name == "add"
       assert func.return_type == "int"
@@ -73,7 +73,7 @@ defmodule Frix.MacroTest do
         end
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       [func] = ir.functions
       assert func.name == "calculate"
       assert func.return_type == "int"
@@ -94,7 +94,7 @@ defmodule Frix.MacroTest do
         end
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       [func] = ir.functions
       assert func.name == "main"
       assert func.return_type == "int"
@@ -121,7 +121,7 @@ defmodule Frix.MacroTest do
         end
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       assert length(ir.variables) == 1
       assert length(ir.functions) == 2
       
@@ -163,7 +163,7 @@ defmodule Frix.MacroTest do
         end
       end
 
-      {:ok, result} = Frix.IR.execute(ir, "main")
+      {:ok, result} = Cix.IR.execute(ir, "main")
       assert result == 8
     end
 
@@ -178,7 +178,7 @@ defmodule Frix.MacroTest do
         end
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       [func] = ir.functions
       assert func.name == "math_ops"
       assert func.return_type == "int"
@@ -202,7 +202,7 @@ defmodule Frix.MacroTest do
       }
       
       # Test execution still works
-      {:ok, result} = Frix.IR.execute(ir, "math_ops", [10, 2])
+      {:ok, result} = Cix.IR.execute(ir, "math_ops", [10, 2])
       assert result == 45
     end
 
@@ -212,7 +212,7 @@ defmodule Frix.MacroTest do
         struct :Rectangle, [top_left: :Point, width: :int, height: :int]
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       assert length(ir.structs) == 2
       
       # Verify Point struct
@@ -235,7 +235,7 @@ defmodule Frix.MacroTest do
 
     test "verifies IR construction with direct IR module usage" do
       # Test direct IR construction and verify structure
-      import Frix.IR
+      import Cix.IR
       
       ir = 
         new()
@@ -247,7 +247,7 @@ defmodule Frix.MacroTest do
         ])
 
       # Verify IR structure
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       assert length(ir.structs) == 1
       assert length(ir.functions) == 1
       
@@ -269,7 +269,7 @@ defmodule Frix.MacroTest do
 
   describe "DSL helper functions" do
     test "builds DSL manually with helper functions" do
-      import Frix.DSL
+      import Cix.DSL
       
       dsl = 
         new()

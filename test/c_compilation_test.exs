@@ -1,7 +1,7 @@
 defmodule CCompilationTest do
   use ExUnit.Case
-  require Frix.Macro
-  import Frix.Macro
+  require Cix.Macro
+  import Cix.Macro
 
   @moduletag :c_compilation
 
@@ -43,7 +43,7 @@ defmodule CCompilationTest do
         end
       end
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       
       # Add necessary includes
       full_c_code = """
@@ -88,17 +88,17 @@ defmodule CCompilationTest do
         # IO.puts("========================")
         
         # Execute the same IR in Elixir for comparison
-        {:ok, elixir_result} = Frix.IR.execute(ir, "main")
+        {:ok, elixir_result} = Cix.IR.execute(ir, "main")
         
         # Both should return 0 (success)
         assert exit_code == 0
         assert elixir_result == 0
         
         # Test individual functions return same values in both environments
-        {:ok, area_result} = Frix.IR.execute(ir, "calculate_area", [10, 5])
+        {:ok, area_result} = Cix.IR.execute(ir, "calculate_area", [10, 5])
         assert area_result == 50
         
-        {:ok, sum_result} = Frix.IR.execute(ir, "point_sum", [3, 4])
+        {:ok, sum_result} = Cix.IR.execute(ir, "point_sum", [3, 4])
         assert sum_result == 7
         
         # Verify C program output contains expected strings
@@ -128,7 +128,7 @@ defmodule CCompilationTest do
         end
       end
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       
       full_c_code = """
       #include <stdio.h>
@@ -156,7 +156,7 @@ defmodule CCompilationTest do
         {output, exit_code} = System.cmd(binary_file, [])
         
         # Execute the same IR in Elixir for comparison
-        {:ok, elixir_result} = Frix.IR.execute(ir, "main")
+        {:ok, elixir_result} = Cix.IR.execute(ir, "main")
         
         # Both should return 0 (success)
         assert exit_code == 0
@@ -166,7 +166,7 @@ defmodule CCompilationTest do
         assert output =~ "5 + 3 + (5 * 3) = 23"
         
         # Test the function directly in Elixir
-        {:ok, calc_result} = Frix.IR.execute(ir, "calculate", [5, 3])
+        {:ok, calc_result} = Cix.IR.execute(ir, "calculate", [5, 3])
         assert calc_result == 23  # 5+3 + 5*3 = 8 + 15 = 23
         
       after
@@ -200,7 +200,7 @@ defmodule CCompilationTest do
         end
       end
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       
       full_c_code = """
       #include <stdio.h>
@@ -232,7 +232,7 @@ defmodule CCompilationTest do
         {output, exit_code} = System.cmd(binary_file, [], stderr_to_stdout: true)
         
         # Execute the same IR in Elixir for comparison
-        {:ok, elixir_result} = Frix.IR.execute(ir, "main")
+        {:ok, elixir_result} = Cix.IR.execute(ir, "main")
         
         # Both should return 0 (success)
         assert exit_code == 0
@@ -260,7 +260,7 @@ defmodule CCompilationTest do
         end
       end
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       
       full_c_code = """
       #include <stdio.h>
@@ -288,14 +288,14 @@ defmodule CCompilationTest do
         {output, exit_code} = System.cmd(binary_file, [])
         
         # Execute the same IR in Elixir for comparison
-        {:ok, elixir_result} = Frix.IR.execute(ir, "main")
+        {:ok, elixir_result} = Cix.IR.execute(ir, "main")
         
         # Both should return 0 (success)
         assert exit_code == 0
         assert elixir_result == 0
         
         # Test the add function directly in both environments
-        {:ok, add_result} = Frix.IR.execute(ir, "add", [15, 27])
+        {:ok, add_result} = Cix.IR.execute(ir, "add", [15, 27])
         assert add_result == 42
         
         # Verify C program output
@@ -324,7 +324,7 @@ defmodule CCompilationTest do
         end
       end
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       
       full_c_code = """
       #include <stdio.h>
@@ -352,8 +352,8 @@ defmodule CCompilationTest do
         {output, exit_code} = System.cmd(binary_file, [])
         
         # Execute the same IR in Elixir for comparison
-        {:ok, elixir_main_result} = Frix.IR.execute(ir, "main")
-        {:ok, elixir_math_result} = Frix.IR.execute(ir, "math_ops", [10, 2])
+        {:ok, elixir_main_result} = Cix.IR.execute(ir, "main")
+        {:ok, elixir_math_result} = Cix.IR.execute(ir, "math_ops", [10, 2])
         
         # Both should return 0 for main function
         assert exit_code == 0
@@ -390,7 +390,7 @@ defmodule CCompilationTest do
         end
       end
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       
       full_c_code = """
       #include <stdio.h>
@@ -418,19 +418,19 @@ defmodule CCompilationTest do
         {output, exit_code} = System.cmd(binary_file, [])
         
         # Execute the same IR in Elixir for comparison
-        {:ok, elixir_result} = Frix.IR.execute(ir, "main")
+        {:ok, elixir_result} = Cix.IR.execute(ir, "main")
         
         # Both should return 0 (success)
         assert exit_code == 0
         assert elixir_result == 0
         
         # Test individual functions in Elixir
-        {:ok, counter_before} = Frix.IR.execute(ir, "get_counter")
+        {:ok, counter_before} = Cix.IR.execute(ir, "get_counter")
         assert counter_before == 0
         
         # Note: Each execution creates a fresh environment in Elixir
         # So we need to test the complete flow
-        {:ok, _} = Frix.IR.execute(ir, "increment")
+        {:ok, _} = Cix.IR.execute(ir, "increment")
         
         # Verify C program output
         assert output =~ "Counter: 1"

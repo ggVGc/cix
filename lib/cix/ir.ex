@@ -1,6 +1,6 @@
-defmodule Frix.IR do
+defmodule Cix.IR do
   @moduledoc """
-  Intermediate Representation (IR) for the Frix DSL.
+  Intermediate Representation (IR) for the Cix DSL.
   
   The IR provides a common format that can be:
   1. Converted to C code

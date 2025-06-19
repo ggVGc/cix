@@ -1,4 +1,4 @@
-defmodule Frix.DSL do
+defmodule Cix.DSL do
   @moduledoc """
   A minimal DSL for generating C code with support for functions and integer values.
   """

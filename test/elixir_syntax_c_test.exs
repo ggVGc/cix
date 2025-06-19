@@ -1,7 +1,7 @@
 defmodule ElixirSyntaxCTest do
   use ExUnit.Case
-  require Frix.Macro
-  import Frix.Macro
+  require Cix.Macro
+  import Cix.Macro
 
   @moduletag :c_compilation
 
@@ -36,7 +36,7 @@ defmodule ElixirSyntaxCTest do
         end
       end
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       
       full_c_code = """
       #include <stdio.h>
@@ -107,7 +107,7 @@ defmodule ElixirSyntaxCTest do
         end
       end
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       
       full_c_code = """
       #include <stdio.h>

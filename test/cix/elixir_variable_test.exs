@@ -1,7 +1,7 @@
-defmodule Frix.ElixirVariableTest do
+defmodule Cix.ElixirVariableTest do
   use ExUnit.Case
-  require Frix.Macro
-  import Frix.Macro
+  require Cix.Macro
+  import Cix.Macro
 
   describe "Elixir-like let syntax" do
     test "generates IR for simple variable with type annotation" do
@@ -9,14 +9,14 @@ defmodule Frix.ElixirVariableTest do
         let count :: int = 42
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       assert length(ir.variables) == 1
       [var] = ir.variables
       assert var.name == "count"
       assert var.type == "int"
       assert var.value == {:literal, 42}
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       assert c_code =~ "int count = 42;"
     end
 
@@ -25,13 +25,13 @@ defmodule Frix.ElixirVariableTest do
         let message :: string = "Hello World"
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       [var] = ir.variables
       assert var.name == "message"
       assert var.type == "string"
       assert var.value == {:literal, "Hello World"}
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       assert c_code =~ "string message = \"Hello World\";"
     end
 
@@ -42,10 +42,10 @@ defmodule Frix.ElixirVariableTest do
         let sum :: int = 30
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       assert length(ir.variables) == 3
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       assert c_code =~ "int x = 10;"
       assert c_code =~ "int y = 20;"
       assert c_code =~ "int sum = 30;"
@@ -65,14 +65,14 @@ defmodule Frix.ElixirVariableTest do
         end
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       assert length(ir.variables) == 1
       assert length(ir.functions) == 2
       
-      {:ok, result} = Frix.IR.execute(ir, "main")
+      {:ok, result} = Cix.IR.execute(ir, "main")
       assert result == 1
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       assert c_code =~ "int global_count = 0;"
       assert c_code =~ "void increment(void) {"
       assert c_code =~ "int main(void) {"
@@ -89,10 +89,10 @@ defmodule Frix.ElixirVariableTest do
         end
       end
 
-      {:ok, result} = Frix.IR.execute(ir, "calculate")
+      {:ok, result} = Cix.IR.execute(ir, "calculate")
       assert result == 50
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       assert c_code =~ "int base = 10;"
       assert c_code =~ "int multiplier = 5;"
     end
@@ -114,7 +114,7 @@ defmodule Frix.ElixirVariableTest do
         end
       end
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       
       full_c_code = """
       #include <stdio.h>

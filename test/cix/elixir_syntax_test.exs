@@ -1,7 +1,7 @@
-defmodule Frix.ElixirSyntaxTest do
+defmodule Cix.ElixirSyntaxTest do
   use ExUnit.Case
-  require Frix.Macro
-  import Frix.Macro
+  require Cix.Macro
+  import Cix.Macro
 
   describe "Elixir-like defn syntax" do
     test "generates IR for function with typed parameters" do
@@ -11,14 +11,14 @@ defmodule Frix.ElixirSyntaxTest do
         end
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       assert length(ir.functions) == 1
       [func] = ir.functions
       assert func.name == "add"
       assert func.return_type == "int"
       assert length(func.params) == 2
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       assert c_code =~ "int add(int x, int y) {"
       assert c_code =~ "    return x + y;"
     end
@@ -30,13 +30,13 @@ defmodule Frix.ElixirSyntaxTest do
         end
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       [func] = ir.functions
       assert func.name == "get_answer"
       assert func.return_type == "int"
       assert func.params == []
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       assert c_code =~ "int get_answer(void) {"
       assert c_code =~ "    return 42;"
     end
@@ -61,11 +61,11 @@ defmodule Frix.ElixirSyntaxTest do
         end
       end
 
-      assert %Frix.IR{} = ir
+      assert %Cix.IR{} = ir
       assert length(ir.variables) == 1
       assert length(ir.functions) == 3
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       assert c_code =~ "int count = 0;"
       assert c_code =~ "void increment(void) {"
       assert c_code =~ "int get_count(void) {"
@@ -88,7 +88,7 @@ defmodule Frix.ElixirSyntaxTest do
         end
       end
 
-      {:ok, result} = Frix.IR.execute(ir, "main")
+      {:ok, result} = Cix.IR.execute(ir, "main")
       assert result == 20
     end
 
@@ -106,11 +106,11 @@ defmodule Frix.ElixirSyntaxTest do
         end
       end
 
-      {:ok, result} = Frix.IR.execute(ir, "main")
+      {:ok, result} = Cix.IR.execute(ir, "main")
       # (5 + 3) * 2 = 16
       assert result == 16
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       assert c_code =~ "int calculate(int a, int b, int c) {"
       assert c_code =~ "sum = a + b;"
       assert c_code =~ "product = sum * c;"
@@ -138,10 +138,10 @@ defmodule Frix.ElixirSyntaxTest do
         end
       end
 
-      {:ok, result} = Frix.IR.execute(ir, "main")
+      {:ok, result} = Cix.IR.execute(ir, "main")
       assert result == 3
       
-      c_code = Frix.IR.to_c_code(ir)
+      c_code = Cix.IR.to_c_code(ir)
       assert c_code =~ "void increment_by_one(void) {"
       assert c_code =~ "void increment_by_two(void) {"
     end

@@ -1,9 +1,9 @@
-defmodule Frix.MixProject do
+defmodule Cix.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :frix,
+      app: :cix,
       version: "0.1.0",
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,

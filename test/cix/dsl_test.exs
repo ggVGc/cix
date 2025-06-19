@@ -1,6 +1,6 @@
-defmodule Frix.DSLTest do
+defmodule Cix.DSLTest do
   use ExUnit.Case
-  alias Frix.DSL
+  alias Cix.DSL
 
   describe "DSL construction" do
     test "creates empty DSL" do
@@ -147,7 +147,7 @@ defmodule Frix.DSLTest do
 
   describe "IR struct functionality" do
     test "creates IR with struct definitions" do
-      import Frix.IR
+      import Cix.IR
       
       ir = 
         new()
