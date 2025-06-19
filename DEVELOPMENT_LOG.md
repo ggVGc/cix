@@ -265,6 +265,92 @@ Global count: 1
 
 ---
 
+## Prompt 8: Elixir-like Function Syntax 
+
+**Timestamp:** 2025-06-19
+
+**User:** Make the functions in the Frix.Macro more similar to Elixir functions.
+
+**Summary of Changes:**
+- Added new `defn` macro with Elixir-like function definition syntax
+- Implemented type annotation support using `::` syntax
+- Added parameter type parsing for natural Elixir syntax
+- Maintained backward compatibility with original `function` macro
+- Enhanced IR execution engine to support function calls in expressions
+- Created comprehensive tests for new syntax
+- Verified C compilation works with new syntax
+
+**Key Features Implemented:**
+
+### **New Function Syntax:**
+- **Parameter Types:** `defn add(x :: int, y :: int) :: int`
+- **No Parameters:** `defn main() :: int`
+- **Natural Elixir Style:** Uses `defn` instead of `function` to avoid Kernel.def conflict
+
+### **Implementation Details:**
+- **Macro Pattern Matching:** Handles `{:"::", _, [{name, _, params}, return_type]}` AST patterns
+- **Type Extraction:** `extract_type_string/1` converts AST type nodes to strings
+- **Parameter Parsing:** `build_elixir_params/1` processes typed parameter lists
+- **Backward Compatibility:** Legacy `function` syntax still fully supported
+
+### **Enhanced IR Execution:**
+- **Function Call Resolution:** Fixed expression evaluation for function calls
+- **Context Management:** Stores IR in process dictionary for nested function calls
+- **Recursive Execution:** Functions can now call other functions during Elixir execution
+
+### **Example Usage:**
+```elixir
+ir = c_program do
+  var :global_value, :int, 100
+  
+  defn add_numbers(a :: int, b :: int) :: int do
+    sum = a + b
+    return sum
+  end
+  
+  defn main() :: int do
+    result = add_numbers(5, 7)
+    printf("Result: %d\\n", result)
+    return 0
+  end
+end
+
+# Works with both C generation and Elixir execution
+c_code = Frix.IR.to_c_code(ir)
+{:ok, result} = Frix.IR.execute(ir)
+```
+
+### **Generated C Code Quality:**
+```c
+int add_numbers(int a, int b) {
+    int sum;
+    sum = a + b;
+    return sum;
+}
+
+int main(void) {
+    int result;
+    result = add_numbers(5, 7);
+    printf("Result: %d\n", result);
+    return 0;
+}
+```
+
+### **Technical Achievements:**
+- **AST Pattern Matching:** Complex macro patterns for natural syntax
+- **Type System Integration:** Seamless type annotation parsing
+- **Mixed Syntax Support:** Old and new syntax work together in same program
+- **Expression Enhancement:** Function calls now work in all expression contexts
+- **C99 Compliance:** Generated code compiles with standard C compilers
+
+### **Test Coverage:**
+- **New Syntax Tests:** 6 comprehensive tests for `defn` functionality
+- **C Compilation Tests:** 2 end-to-end compilation tests with GCC
+- **Mixed Syntax Tests:** Verification that old and new syntax coexist
+- **Total Tests:** 33 passing tests (increased from 25)
+
+---
+
 ## Summary of Complete System
 
 The Frix DSL development resulted in a comprehensive system with:

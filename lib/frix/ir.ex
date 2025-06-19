@@ -92,6 +92,9 @@ defmodule Frix.IR do
   Execute IR directly in Elixir.
   """
   def execute(%__MODULE__{} = ir, function_name \\ "main", args \\ []) do
+    # Store IR context in process dictionary for function calls
+    Process.put(:current_ir, ir)
+    
     # Initialize variables in process dictionary
     Enum.each(ir.variables, fn var ->
       value = case var.value do
@@ -107,10 +110,14 @@ defmodule Frix.IR do
     end)
 
     # Find and execute function
-    case Enum.find(ir.functions, &(&1.name == function_name)) do
+    result = case Enum.find(ir.functions, &(&1.name == function_name)) do
       nil -> {:error, "Function #{function_name} not found"}
       function -> execute_function(ir, function, args)
     end
+    
+    # Clean up process dictionary
+    Process.delete(:current_ir)
+    result
   end
 
   # Private helper functions for C code generation
@@ -339,11 +346,20 @@ defmodule Frix.IR do
   end
 
   defp evaluate_expression({:call, func_name, args}) do
-    # This is a placeholder - in a real implementation we'd need the IR context
-    # For now, return 0 as placeholder
-    _ = func_name
-    _ = args
-    0
+    # Get the IR context from the process dictionary
+    case Process.get(:current_ir) do
+      nil -> 0  # Fallback if no IR context available
+      ir ->
+        case Enum.find(ir.functions, &(&1.name == func_name)) do
+          nil -> 0  # Function not found
+          function ->
+            evaluated_args = Enum.map(args, &evaluate_expression/1)
+            case execute_function(ir, function, evaluated_args) do
+              {:ok, result} -> result
+              _ -> 0
+            end
+        end
+    end
   end
 
   defp evaluate_expression({:struct_new, struct_name, field_inits}) do

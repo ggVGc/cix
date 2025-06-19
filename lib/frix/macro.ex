@@ -17,11 +17,11 @@ defmodule Frix.Macro do
         var :count, :int, 42
         var :origin, :Point, Point.new(x: 0, y: 0)
         
-        function :add, :int, [x: :int, y: :int] do
+        def add(x :: int, y :: int) :: int do
           return x + y
         end
         
-        function :main, :int do
+        def main() :: int do
           printf("Hello World!")
           return 0
         end
@@ -35,7 +35,7 @@ defmodule Frix.Macro do
   """
   defmacro c_program(do: block) do
     quote do
-      import Frix.Macro, only: [var: 3, function: 3, function: 4, return: 1, struct: 2]
+      import Frix.Macro, only: [var: 3, defn: 2, return: 1, struct: 2]
       var!(ir) = Frix.IR.new()
       unquote(transform_block(block))
       var!(ir)
@@ -52,8 +52,36 @@ defmodule Frix.Macro do
   end
 
   @doc """
-  Adds a function with parameters to the current IR context.
+  Adds a function using Elixir-like defn syntax (def conflicts with Kernel.def).
+  
+  Examples:
+    defn add(x :: int, y :: int) :: int do
+      return x + y
+    end
+    
+    defn main() :: int do
+      return 0
+    end
   """
+  defmacro defn({:"::", _, [{name, _, params}, return_type]}, do: body) when is_list(params) do
+    return_type_str = extract_type_string(return_type)
+    quote do
+      params_list = unquote(build_elixir_params(params))
+      body_list = unquote(transform_function_body(body))
+      var!(ir) = Frix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), params_list, body_list)
+    end
+  end
+
+  defmacro defn({:"::", _, [{name, _, nil}, return_type]}, do: body) do
+    return_type_str = extract_type_string(return_type)
+    quote do
+      body_list = unquote(transform_function_body(body))
+      var!(ir) = Frix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), [], body_list)
+    end
+  end
+
+  # Legacy support for old function syntax
+  @doc false
   defmacro function(name, return_type, params, do: body) do
     quote do
       params_list = unquote(build_ir_params(params))
@@ -62,9 +90,7 @@ defmodule Frix.Macro do
     end
   end
 
-  @doc """
-  Adds a function without parameters to the current IR context.
-  """
+  @doc false
   defmacro function(name, return_type, do: body) do
     quote do
       body_list = unquote(transform_function_body(body))
@@ -120,6 +146,25 @@ defmodule Frix.Macro do
     end
   end
 
+  # Handle new defn syntax in statement transformation
+  defp transform_statement({:defn, _, [{:"::", _, [{name, _, params}, return_type]}, [do: body]]}) when is_list(params) do
+    return_type_str = extract_type_string(return_type)
+    quote do
+      params_list = unquote(build_elixir_params(params))
+      body_list = unquote(transform_function_body(body))
+      var!(ir) = Frix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), params_list, body_list)
+    end
+  end
+
+  defp transform_statement({:defn, _, [{:"::", _, [{name, _, nil}, return_type]}, [do: body]]}) do
+    return_type_str = extract_type_string(return_type)
+    quote do
+      body_list = unquote(transform_function_body(body))
+      var!(ir) = Frix.IR.add_function(var!(ir), unquote(to_string(name)), unquote(return_type_str), [], body_list)
+    end
+  end
+
+  # Legacy function syntax support
   defp transform_statement({:function, _, [name, return_type, params, [do: body]]}) do
     quote do
       params_list = unquote(build_ir_params(params))
@@ -143,6 +188,22 @@ defmodule Frix.Macro do
     params
     |> Enum.map(fn {name, type} ->
       quote do: %{name: unquote(to_string(name)), type: unquote(to_string(type))}
+    end)
+  end
+
+  defp build_elixir_params(params) when is_list(params) do
+    params
+    |> Enum.map(fn
+      {:"::", _, [{name, _, nil}, type]} ->
+        type_str = case type do
+          {type_name, _, nil} -> to_string(type_name)
+          type_name when is_atom(type_name) -> to_string(type_name)
+          _ -> "int"
+        end
+        quote do: %{name: unquote(to_string(name)), type: unquote(type_str)}
+      {name, _, nil} ->
+        # Default to int if no type specified
+        quote do: %{name: unquote(to_string(name)), type: "int"}
     end)
   end
 
@@ -241,5 +302,13 @@ defmodule Frix.Macro do
     |> Enum.map(fn {field_name, expr} ->
       quote do: {unquote(to_string(field_name)), unquote(transform_ir_expression(expr))}
     end)
+  end
+
+  defp extract_type_string(type) do
+    case type do
+      {type_name, _, nil} -> to_string(type_name)
+      type_name when is_atom(type_name) -> to_string(type_name)
+      _ -> "int"
+    end
   end
 end
